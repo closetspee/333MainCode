@@ -1,0 +1,983 @@
+local BaseModuleURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule?token=GHSAT0AAAAAACU3DLVQBL3GNINET5VT72L6ZUUP6XA";
+local BaseUIURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI?token=GHSAT0AAAAAACU3DLVQIZHBZO4URSH7TXJOZUUP6XQ";
+
+local BaseModule = game:HttpGet(BaseModuleURL);
+local BaseUI = game:HttpGet("BaseUIURL);
+
+local Players = game:GetService("Players");
+local UserInputService = game:GetService("UserInputService");
+local TeleportService = game:GetService("TeleportService");
+local ReplicatedStorage = game:GetService("ReplicatedStorage");
+local HttpService = game:GetService("HttpService");
+
+local LocalPlayer = Players.LocalPlayer;
+local Mouse = LocalPlayer:GetMouse();
+
+BaseUI.CreateCommand({
+    CommandName = "ChangeKeybind";
+    Description = "Changes the keybind to the next input.";
+    Function = function()
+        local InputConn;
+        InputConn = UserInputService.InputBegan:Connect(function(Input, GPE)
+            if (GPE) then
+                return;
+            end
+            pcall(function()
+                InputConn:Disconnect();
+            end)
+            InputConn = nil;
+            BaseUI.ChangeKeybind(Input.KeyCode);
+        end)
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "NoClip";
+    Description = "Turns on noclip.";
+    Function = function()
+        BaseModule.ToggleNoClip(true);
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "Clip";
+    Description = "Turns off noclip.";
+    Function = function()
+        BaseModule.ToggleNoClip(false);
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "CheckAccountAge";
+    Description = "Prints the user's account age.";
+    DisplayText = "CheckAccountAge [UserName]";
+    Function = function(TargetName: string)
+        if (TargetName == nil) then
+            return;
+        end
+        local Player: Player? = BaseModule.GetPlayerFromTargetName(TargetName);
+        if (Player) then
+            BaseUI.Notify("Player Age", Player.DisplayName.." is: "..Player.AccountAge.." days old.");
+        end
+    end;
+    Parameters = {
+        [1] = function()
+            local PlayerNames = {"Me","Nearest","Furthest","Random"};
+            for _, v in next, Players:GetPlayers() do
+                table.insert(PlayerNames, v.Name);
+            end
+            return PlayerNames;
+        end;
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "FlingNearest";
+    Description = "Attempts to fling the nearest player.";
+    Function = function()
+        local Nearest: Player? = BaseModule.GetNearestPlayer();
+        if (Nearest) then
+            BaseModule.FlingPlayer(Nearest);
+        end
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "To";
+    DisplayText = "To [User] [Force Pivot]?";
+    Description = "Teleports you to a player. Uses pivot if no root part (Forceable).";
+    Function = function(TargetName: string, Pivot: string)
+        if (TargetName == nil) then
+            return;
+        end
+        local TargetPlayer: Player? = BaseModule.GetPlayerFromTargetName(TargetName);
+        if (not TargetPlayer or TargetPlayer == LocalPlayer) then
+            return;
+        end
+        local LocalRoot: BasePart? = BaseModule.GetPlayerRoot(LocalPlayer);
+        if (not LocalRoot) then
+            return;
+        end
+
+        Pivot = Pivot or "";
+        Pivot = string.lower(Pivot);
+        local ForcePivot = nil;
+        if (Pivot ~= "") then
+            if (Pivot == "true" or string.find("true", Pivot) == 1) then
+                ForcePivot = true;
+            elseif (Pivot == "false" or string.find("false", Pivot) == 1) then
+                ForcePivot = false;
+            end
+        end
+
+        local TargetRoot = BaseModule.GetPlayerRoot(TargetPlayer);
+        if (ForcePivot ~= true and TargetRoot) then
+            LocalRoot.CFrame = TargetRoot.CFrame;
+            return;
+        end
+
+        local TargetChar = TargetPlayer.Character;
+        if (ForcePivot ~= false and TargetChar) then
+            LocalRoot.CFrame = CFrame.new(TargetChar.WorldPivot.Position);
+        end
+    end;
+    Parameters = {
+        [1] = function()
+            local PlayerNames = {"Nearest","Furthest","Random"};
+            for _, v in next, Players:GetPlayers() do
+                if (v == LocalPlayer) then
+                    continue;
+                end
+                table.insert(PlayerNames, v.Name);
+            end
+            return PlayerNames;
+        end;
+        [2] = function()
+            return {"true","false"};
+        end;
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "FlingPlayer";
+    DisplayText = "FlingPlayer [User]";
+    Description = "Flings the player if possible. (Requires player collisions)";
+    Function = function(TargetName: string?)
+        if (not TargetName) then
+            return;
+        end
+        local Player: Player = BaseModule.GetPlayerFromTargetName(TargetName);
+        if (not Player or BaseModule.STORAGE.Flinging == true or Player == LocalPlayer) then
+            return;
+        end
+        BaseModule.FlingPlayer(Player);
+    end;
+    Parameters = {
+        [1] = function()
+            local PlayerNames = {"Nearest","Furthest","Random"};
+            for _, v in next, Players:GetPlayers() do
+                if (v == LocalPlayer) then
+                    continue;
+                end
+                table.insert(PlayerNames, v.Name);
+            end
+            return PlayerNames;
+        end;
+    };
+});
+local BingBongActive = false;
+BaseUI.CreateCommand({
+    CommandName = "BingBong";
+    DisplayText = "BingBong (V2)";
+    Description = "Ultimate server destruction. (Requires Player Collisions)";
+    Function = function()
+        BingBongActive = not BingBongActive;
+
+        if (BingBongActive == false) then
+            return;
+        end
+
+        local Connections = {};
+
+        local AllSeats: {Seat} = {};
+        for _, Desc in next, workspace:GetDescendants() do
+            if (Desc:IsA("Seat")) then
+                table.insert(AllSeats, Desc);
+            end
+        end
+        local SeatAddConn = workspace.DescendantAdded:Connect(function(Desc)
+            if (Desc:IsA("Seat")) then
+                table.insert(AllSeats, Desc);
+            end
+        end)
+        table.insert(Connections, SeatAddConn);
+
+        local LocalHum: Humanoid? = BaseModule.GetPlayerHumanoid(LocalPlayer);
+        local LocalRoot: BasePart? = BaseModule.GetPlayerRoot(LocalPlayer);
+        if (not LocalRoot or not LocalHum or LocalHum.Health <= 0) then
+            return;
+        end
+        local Pivot = LocalRoot.Position;
+        local MaxPivotDistance = 1500;
+
+        local HumDiedConn = LocalHum.Died:Connect(function()
+            BingBongActive = false;
+        end)
+        table.insert(Connections, HumDiedConn);
+
+        local BestTarget: Player? = nil;
+
+        task.spawn(function()
+            while (task.wait()) do
+                if (BingBongActive == false) then
+                    break;
+                end
+
+                if (BestTarget == nil or BaseModule.STORAGE.Flinging == false) then
+                    continue;
+                end
+
+                local TargetRoot: BasePart? = BaseModule.GetPlayerRoot(BestTarget);
+                if (not TargetRoot or (TargetRoot.Position - Pivot.Magnitude) > MaxPivotDistance) then
+                    BaseModule.STORAGE.Flinging = false;
+                    continue;
+                end
+            end
+        end)
+
+        while (task.wait()) do
+            if (BingBongActive == false) then
+                break;
+            end
+
+            BestTarget = nil;
+            local Closest = math.huge;
+
+            for _, Player in next, Players:GetPlayers() do
+                if (Player == LocalPlayer) then
+                    continue;
+                end
+
+                local Root: BasePart? = BaseModule.GetPlayerRoot(Player);
+                local Hum: Humanoid? = BaseModule.GetPlayerHumanoid(Player);
+                if (not Root or not Hum or Root.Anchored == true or Hum.Health <= 0 or Hum.SeatPart ~= nil) then
+                    continue;
+                end
+
+                local PivotDis = (Root.Position - Pivot).Magnitude;
+                if (PivotDis > MaxPivotDistance) then
+                    continue;
+                end;
+
+                local ClosestLocal = math.huge;
+                if (#AllSeats > 0) then
+                    for _, Seat in next, AllSeats do
+                        local Dis = (Root.Position - Seat.Position).Magnitude;
+                        if (Dis > 3 and Dis < ClosestLocal) then
+                            ClosestLocal = Dis;
+                        end
+                    end
+                else
+                    ClosestLocal = (Root.Position - LocalRoot.Position).Magnitude;
+                end
+                if (ClosestLocal < Closest) then
+                    Closest = ClosestLocal;
+                    BestTarget = Player;
+                end
+            end
+
+            if (not BestTarget) then
+                LocalRoot.CFrame = CFrame.new(Pivot);
+                continue;
+            end
+
+            BaseModule.FlingPlayer(BestTarget);
+            pcall(function()
+                LocalRoot.Position = Pivot;
+            end)
+        end
+
+        for I, V in next, Connections do
+            pcall(function()
+                V:Disconnect();
+            end)
+            Connections[I] = nil;
+        end
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "DestroyInstances";
+    DisplayText = "DestroyInstances [Class Name]";
+    Description = "Destroys all instances of a class from the workspace.";
+    Function = function(ClassName: string)
+        if (not ClassName) then
+            return;
+        end
+
+        local Valid = pcall(function()
+            Instance.new(ClassName):Destroy();
+        end)
+
+        if (not Valid) then
+            BaseUI.Notify("Failure.", "Invalid Class Name");
+            return;
+        end
+
+        local Destroyed = 0;
+        for _, Desc in next, workspace:GetDescendants() do
+            if (Desc:IsA(ClassName)) then
+                Desc:Destroy();
+                Destroyed += 1;
+            end
+        end
+
+        BaseUI.Notify("Success!", "Destroyed "..Destroyed.." "..ClassName.."'s");
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "ToggleSeats";
+    DisplayText = "ToggleSeats [Toggle]?";
+    Description = "Toggles seats if you're able to sit in them or not. Useful for flinging.";
+    Function = function(Toggle: string)
+        local Force = nil;
+
+        if (Toggle ~= nil) then
+            Toggle = string.lower(Toggle);
+            if (Toggle == "true" or string.find("true", Toggle) == 1) then
+                Force = true;
+            elseif (Toggle == "false" or string.find("false", Toggle) == 1) then
+                Force = false;
+            end
+        end
+
+        for _, Desc in next, game:GetDescendants() do
+            if (Desc:IsA("Seat")) then
+                if (Force ~= nil) then
+                    if (Force == true) then
+                        Desc.Parent = workspace;
+                    else
+                        Desc.Parent = ReplicatedStorage;
+                    end
+                else
+                    if (Desc.Parent == ReplicatedStorage) then
+                        Desc.Parent = workspace;
+                    else
+                        Desc.Parent = ReplicatedStorage;
+                    end
+                end
+            end
+        end
+    end;
+    Parameters = {
+        [1] = function()
+            return {"true","false"};
+        end
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "NoCollisionFling";
+    DisplayText = "NoCollisionFling [Player Name]";
+    Description = "Attempts to fling a player using unanchored parts.";
+    Function = function(TargetName: string)
+        if (TargetName == nil) then
+            return;
+        end
+
+        local Player: Player = BaseModule.GetPlayerFromTargetName(TargetName);
+        if (Player == nil or Player == LocalPlayer) then
+            return;
+        end
+        
+        local LocalRoot: BasePart = BaseModule.GetPlayerRoot(LocalPlayer);
+        local TargetRoot: BasePart = BaseModule.GetPlayerRoot(Player);
+        if (not TargetRoot or not LocalRoot) then
+            return;
+        end
+        local Parts = BaseModule.GetUnanchoredParts();
+
+        for I, V in next, Parts do
+            if (I > 15 or not LocalRoot or not TargetRoot) then
+                break;
+            end
+
+            local Part: BasePart = V.Part;
+            Part.CanCollide = false;
+
+            local BP = Instance.new("BodyPosition", Part);
+            BP.MaxForce = Vector3.new(9e9 * 9e9, 9e9 * 9e9, 9e9 * 9e9);
+            BP.D = 15;
+            BP.P *= 10;
+
+            local MoveOn = false;
+
+            task.wait();
+
+            task.delay(1.5, function()
+                MoveOn = true;
+            end)
+
+            repeat
+                BP.Position = TargetRoot.Position;
+                LocalRoot.CFrame = CFrame.new(Part.Position);
+                task.wait();
+            until (MoveOn == true or not Part or not LocalRoot or not TargetRoot);
+
+            BP:Destroy();
+        end
+    end;
+    Parameters = {
+        [1] = function()
+            local PlayerNames = {"Nearest","Furthest","Random"};
+            for _, v in next, Players:GetPlayers() do
+                if (v == LocalPlayer) then
+                    continue;
+                end
+                table.insert(PlayerNames, v.Name);
+            end
+            return PlayerNames;
+        end;
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "Speed";
+    DisplayText = "Speed [number]";
+    Description = "Changes your walk speed.";
+    Function = function(Speed)
+        if (not tonumber(Speed)) then
+            return;
+        end
+        Speed = tonumber(Speed);
+        local Hum: Humanoid? = BaseModule.GetPlayerHumanoid(LocalPlayer);
+        if (not Hum) then
+            return;
+        end
+        Hum.WalkSpeed = Speed;
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "Jump";
+    DisplayText = "Jump [number]";
+    Description = "Changes your jump power.";
+    Function = function(Jump)
+        if (not tonumber(Jump)) then
+            return;
+        end
+        Jump = tonumber(Jump);
+        local Hum: Humanoid? = BaseModule.GetPlayerHumanoid(LocalPlayer);
+        if (not Hum) then
+            return;
+        end
+        Hum.JumpPower = Jump;
+        Hum.UseJumpPower = true;
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "FireModuleFunction";
+    DisplayText = "FireModuleFunction [Function Name] [...]?";
+    Description = "Fires a function in the base module with the inputted parameters.";
+    Function = function(...)
+        local Args = {...};
+        local Function = BaseModule[Args[1]];
+        if (not Function or typeof(Function) ~= "function") then
+            return;
+        end
+
+        local Parameters = {};
+        local Length = BaseModule.GetTableLength(Args);
+        if (Length > 1) then
+            for I = 2, Length do
+                local Val = Args[I];
+                Val = string.lower(Val);
+                if (tonumber(Val)) then
+                    Val = tonumber(Val);
+                elseif (Val == "true") then
+                    Val = true;
+                elseif (Val == "false") then
+                    Val = false;
+                elseif (Val == "nil") then
+                    Val = nil;
+                end
+                table.insert(Parameters, Val);
+            end
+        end
+
+        task.spawn(Function, unpack(Parameters));
+    end;
+    Parameters = {
+        [1] = function()
+            local FuncNames = {};
+            for I, V in next, BaseModule do
+                if (typeof(V) == "function") then
+                    table.insert(FuncNames, I);
+                end
+            end
+            return FuncNames;
+        end
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "Gravity Gun";
+    Description = "Gives you a gravity gun tool which allows movement of non-anchored parts.";
+    Function = function()
+        local MainTool = Instance.new("Tool");
+        MainTool.Name = "Gravity Gun";
+        MainTool.CanBeDropped = false;
+
+        local MainHandle = Instance.new("Part", MainTool);
+        MainHandle.CanCollide = false;
+        MainHandle.Size = Vector3.new(1, 1, 1);
+        MainHandle.Material = Enum.Material.Neon;
+        MainHandle.Anchored = false;
+        MainHandle.Name = "Handle";
+        MainHandle.Transparency = 1;
+        MainHandle.Size = Vector3.new(0.5,0.5,0.5);
+
+        BaseModule.CreateLocalScript(function()
+            local Tool = script.Parent;
+            local Handle = Tool.Handle;
+            local Equipped = false;
+            local MouseDown = false;
+
+            local Point = Instance.new("Part");
+            Point.Locked = true;
+            Point.Anchored = true;
+            Point.Shape = Enum.PartType.Ball;
+            Point.Material = Enum.Material.Neon;
+            Point.Color = Color3.new(1,0,0);
+            Point.Size = Vector3.new(0.3,0.3,0.3);
+            Point.CanCollide = false;
+            Point.Transparency = 0.5
+
+            local Object = nil;
+            local Dist = 0;
+
+            Tool.Equipped:Connect(function()
+                Equipped = true;
+            end)
+            Tool.Unequipped:Connect(function()
+                Equipped = false;
+            end)
+
+            Mouse.Button1Down:Connect(function()
+                MouseDown = true;
+
+                if (Equipped == false) then
+                    return;
+                end
+
+                task.spawn(function()
+                    local P = Point:Clone();
+                    P.Parent = Tool;
+
+                    while (MouseDown == true and Equipped == true) do
+                        P.Parent = Tool;
+                        P.CFrame = CFrame.new(Mouse.Hit.Position);
+                        if (Object ~= nil) then
+                            break;
+                        end
+
+                        task.wait();
+                    end
+
+                    P:Destroy();
+                end)
+
+                while (MouseDown == true and Equipped == true) do
+                    local Target = Mouse.Target;
+                    if (Target ~= nil and Target.Anchored == false) then
+                        Object = Target;
+                        Dist = (Handle.Position - Target.Position).Magnitude;
+                        break;
+                    end
+
+                    task.wait();
+                end
+
+                local BP = Instance.new("BodyPosition");
+                BP.MaxForce = Vector3.new(math.huge*math.huge,math.huge*math.huge,math.huge*math.huge);
+                BP.P = BP.P*10;
+                BP.D = 400;
+
+                while (MouseDown == true and Equipped == true) do
+                    if (not Object or not Object.Parent) then
+                        break;
+                    end
+                    if (Object.Parent:IsA("Model")) then
+                        Mouse.TargetFilter = Object.Parent;
+                    else
+                        Mouse.TargetFilter = Object;
+                    end
+                    local LookVector = CFrame.new(Handle.Position, Mouse.Hit.Position);
+
+                    BP.Parent = Object;
+                    BP.Position = Handle.Position + LookVector.LookVector * Dist;
+                    Object.CanCollide = false;
+
+                    task.wait();
+                end
+
+                Mouse.TargetFilter = nil;
+                BP:Destroy();
+                Object.CanCollide = true;
+                Object = nil;
+            end)
+            Mouse.Button1Up:Connect(function()
+                MouseDown = false;
+            end)
+        end, MainTool);
+
+        MainTool.Parent = LocalPlayer.Backpack;
+
+        BaseUI.Notify("Success", "Gave the tool.");
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "DelCharPrevs";
+    Description = "Deletes all the character previews.";
+    Function = function()
+        local Folder = workspace:FindFirstChild("PlayerCharacterPreviews");
+        if (Folder) then
+            Folder:Destroy();
+        end
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "CharPreviews";
+    Description = "Shows a transparent clone of all characters.";
+    Function = function()
+        local Folder = workspace:FindFirstChild("PlayerCharacterPreviews");
+        if (not Folder) then
+            Folder = Instance.new("Folder", workspace);
+            Folder.Name = "PlayerCharacterPreviews";
+        end
+
+        local NewFolder = Instance.new("Folder", Folder);
+        NewFolder.Name = tostring(#Folder:GetChildren());
+
+        for _, Player in next, Players:GetPlayers() do
+            local Char = Player.Character;
+            if (not Char) then
+                continue;
+            end
+
+            Char.Archivable = true;
+            local Clone = Char:Clone();
+
+            Clone.Name = Player.Name;
+            Clone.Parent = NewFolder;
+
+            local Hum = Char:FindFirstChildOfClass("Humanoid");
+            
+            if (Hum) then
+                Hum.MaxHealth = math.huge;
+                Hum.Health = math.huge;
+                Hum.RequiresNeck = false;
+                Hum.BreakJointsOnDeath = false;
+            end
+            
+            for _, Desc in next, Clone:GetDescendants() do
+                if (Desc:IsA("BasePart")) then
+                    Desc.Anchored = true;
+                end
+            end
+
+            task.wait();
+
+            for _, Desc in next, Clone:GetDescendants() do
+                if (Desc:IsA("LocalScript") or Desc:IsA("Script") or Desc:IsA("ModuleScript")) then
+                    Desc:Destroy();
+                elseif (Desc:IsA("BasePart")) then
+                    Desc.CanCollide = false;
+                    Desc.CanQuery = false;
+                    Desc.CanTouch = false;
+
+                    if (Desc.Name == "HumanoidRootPart") then
+                        Desc.Transparency = 1;
+                    else
+                        Desc.Transparency = math.clamp(Desc.Transparency, 0.5, 1);
+                    end
+                end
+            end
+        end
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "RejoinGame";
+    Description = "Re-Joins the game.";
+    Function = function()
+        LocalPlayer:Kick("Rejoining game...");
+        task.wait();
+        TeleportService:Teleport(game.PlaceId, LocalPlayer);
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "RejoinServer";
+    Description = "Re-Joins the server.";
+    Function = function()
+        LocalPlayer:Kick("Rejoining server...");
+        task.wait();
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer);
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "Sit";
+    Description = "Makes you sit.";
+    Function = function()
+        local Hum: Humanoid? = BaseModule.GetPlayerHumanoid(LocalPlayer);
+        if (not Hum) then
+            return;
+        end
+
+        Hum.Sit = true;
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "Spin";
+    DisplayText = "Spin [Speed]?";
+    Description = "Makes your character spin at a set speed.";
+    Function = function(Speed)
+        if (not Speed or not tonumber(Speed)) then
+            Speed = 1;
+        else
+            Speed = tonumber(Speed);
+        end
+
+        local LocalRoot = BaseModule.GetPlayerRoot(LocalPlayer);
+        if (not LocalRoot) then
+            return;
+        end
+
+        local Spin = LocalRoot:FindFirstChild("SpinningGyro") or Instance.new("BodyAngularVelocity", LocalRoot);
+        Spin.Name = "SpinningGyro";
+        Spin.MaxTorque = Vector3.new(0, math.huge, 0);
+        Spin.AngularVelocity = Vector3.new(0, Speed, 0);
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "Unspin";
+    Description = "Stops your spinning.";
+    Function = function()
+        local LocalRoot = BaseModule.GetPlayerRoot(LocalPlayer);
+        if (not LocalRoot) then
+            return;
+        end
+
+        local Spin = LocalRoot:FindFirstChild("SpinningGyro");
+        if (Spin) then
+            Spin:Destroy();
+        end
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "Laydown";
+    Description = "Makes your character lay.";
+    Function = function()
+        local Root: BasePart? = BaseModule.GetPlayerRoot(LocalPlayer);
+        local Hum: Humanoid? = BaseModule.GetPlayerHumanoid(LocalPlayer);
+        if (not Hum or not Root) then
+            return;
+        end
+        local Animator = Hum:FindFirstChildOfClass("Animator");
+
+        Hum.Sit = true;
+        task.wait(0.1);
+
+        Root.CFrame *= CFrame.Angles(math.pi * 0.5, 0, 0);
+        for _, v in next, Animator:GetPlayingAnimationTracks() do
+            if (v.IsPlaying == true) then
+                v:Stop(0);
+            end
+        end
+    end;
+});
+local ESPInstances: {Instance} = {};
+local ESPConnections: {RBXScriptConnection} = {};
+local ESPEnabled = false;
+BaseUI.CreateCommand({
+    CommandName = "ToggleESP";
+    Description = "Toggles ESP.";
+    Function = function()
+        ESPEnabled = not ESPEnabled;
+
+        if (ESPEnabled == true) then
+            local PlayerFound = function(Player: Player)
+                if (Player == LocalPlayer) then
+                    return;
+                end
+                local CharFound = function(Char: Model)
+                    local NewHighlight = Instance.new("Highlight", Char);
+                    NewHighlight.FillColor = Color3.new(1,1,1);
+                    NewHighlight.FillTransparency = 0.5;
+                    NewHighlight.OutlineTransparency = 1;
+                    NewHighlight.Adornee = Char;
+                    NewHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop;
+                    table.insert(ESPInstances, NewHighlight);
+
+                    local Head = Char:FindFirstChild("Head");
+                    if (not Head) then
+                        task.wait(0.3);
+                        Head = Char:FindFirstChild("Head");
+                        if (not Head) then
+                            return;
+                        end
+                    end
+                    
+                    local NewBill = Instance.new("BillboardGui", Head);
+                    NewBill.AlwaysOnTop = true;
+                    NewBill.Adornee = Head;
+                    NewBill.Size = UDim2.fromScale(1, 1);
+                    NewBill.StudsOffset = Vector3.new(0, 2, 0);
+                    NewBill.ClipsDescendants = false;
+                    table.insert(ESPInstances, NewBill);
+
+                    local NewLabel = Instance.new("TextLabel", NewBill);
+                    NewLabel.BackgroundTransparency = 1;
+                    NewLabel.TextColor3 = Color3.new(1, 1, 1);
+                    NewLabel.Size = UDim2.fromScale(1, 1);
+                    NewLabel.Text = Player.Name;
+                    NewLabel.BorderSizePixel = 0;
+                end
+                if (Player.Character) then
+                    CharFound(Player.Character);
+                end
+                local Conn = Player.CharacterAdded:Connect(CharFound);
+                table.insert(ESPConnections, Conn);
+            end
+            for _, Player in next, Players:GetPlayers() do
+                PlayerFound(Player);
+            end
+            local Conn = Players.PlayerAdded:Connect(PlayerFound);
+            table.insert(ESPConnections, Conn);
+        else
+            for I, V in next, ESPConnections do
+                pcall(function()
+                    V:Disconnect();
+                end)
+                ESPConnections[I] = nil;
+            end
+
+            for _, V in next, ESPInstances do
+                if (V ~= nil) then
+                    V:Destroy();
+                end
+            end
+        end
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "JoinGamePlace";
+    DisplayText = "JoinGame [PlaceId]";
+    Function = function(Id)
+        if (not Id or not tonumber(Id)) then
+            BaseUI.Notify("Error!", "Invalid Game Id");
+            return;
+        end
+        Id = tonumber(Id);
+
+        TeleportService:Teleport(Id, LocalPlayer);
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "GetPlayerGames";
+    DisplayText = "GetPlayerGames [Player User/Id]";
+    Function = function(Target)
+        if (not Target) then
+            return;
+        end
+
+        local TargetPlayer;
+        if (tonumber(Target)) then
+            Target = tonumber(Target);
+            TargetPlayer = {
+                Name = Players:GetNameFromUserIdAsync(Target);
+                UserId = Target;
+            };
+        else
+            TargetPlayer = BaseModule.GetPlayerFromTargetName(Target);
+            if (not TargetPlayer) then
+                return;
+            end
+        end
+
+        local Link = "https://games.roproxy.com/v2/users/"..TargetPlayer.UserId.."/games?sortOrder=Asc&limit=50";
+        local Data = game:HttpGet(Link);
+        Data = HttpService:JSONDecode(Data);
+
+        local Games = {};
+        for _, Experience in next, Data.data do
+            local RootPlaceID: number = Experience.rootPlace.id;
+            local PlaceName: string = Experience.name;
+            table.insert(Games, {
+                Id = RootPlaceID;
+                Name = PlaceName;
+            });
+        end
+
+        local Length = BaseModule.GetTableLength(Games);
+        if (Length <= 0) then
+            BaseUI.Notify("No Games!", "No games found for user.");
+            return;
+        end
+
+        BaseUI.Warn("\n"..TargetPlayer.Name.."'s Games: "..Length);
+        for _, Game in next, Games do
+            BaseUI.Print("  "..Game.Name.." - "..Game.Id);
+        end
+        BaseUI.Warn("----\n");
+            
+        BaseUI.Notify("Games Found!", "Check Console for info.");
+    end;
+    Parameters = {
+        [1] = function()
+            local PlayerNames = {"Me","Nearest","Furthest","Random"};
+            for _, v in next, Players:GetPlayers() do
+                table.insert(PlayerNames, v.Name);
+            end
+            return PlayerNames;
+        end;
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "Dex";
+    Description = "Loads Dex by Moon.";
+    Function = function()
+        BaseUI.Notify("Loading", "Loading dex...");
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))();
+    end;
+});
+local ThrowingHands = false;
+BaseUI.CreateCommand({
+    CommandName = "ThrowHands";
+    DisplayText = "ThrowHands [Player]";
+    Description = "Makes you fight the player.";
+    Function = function(TargetName)
+        if (not TargetName or ThrowingHands == true) then
+            return;
+        end
+
+        local TargetPlayer: Player? = BaseModule.GetPlayerFromTargetName(TargetName);
+        if (not TargetPlayer or TargetPlayer == LocalPlayer) then
+            return;
+        end
+
+        local TargetRoot: BasePart? = BaseModule.GetPlayerRoot(TargetPlayer);
+        local LocalRoot: BasePart? = BaseModule.GetPlayerRoot(LocalPlayer);
+        local PlayingAnim: AnimationTrack? = BaseModule.LoadAnimation(10717116749);
+
+        if (not TargetRoot or not LocalRoot or not PlayingAnim or BaseModule.STORAGE.Flinging == true) then
+            return;
+        end
+        local StopFunc = BaseModule.LoopAnimation(PlayingAnim);
+
+        ThrowingHands = true;
+
+        task.spawn(function()
+            while (task.wait()) do
+                if (not TargetRoot or not TargetRoot.Parent or not LocalRoot or not LocalRoot.Parent or ThrowingHands == false or BaseModule.STORAGE.Flinging == true) then
+                    break;
+                end
+
+                LocalRoot.CFrame = CFrame.lookAt((TargetRoot.CFrame * CFrame.new(0, 0, -3)).Position, TargetRoot.Position);
+            end
+
+            ThrowingHands = false;
+            StopFunc();
+        end)
+    end;
+    Parameters = {
+        [1] = function()
+            local PlayerNames = {"Nearest","Furthest","Random"};
+            for _, v in next, Players:GetPlayers() do
+                if (v == LocalPlayer) then
+                    continue;
+                end
+                table.insert(PlayerNames, v.Name);
+            end
+            return PlayerNames;
+        end;
+    };
+});
+BaseUI.CreateCommand({
+    CommandName = "CatchHands";
+    Description = "Stops fighting.";
+    Function = function()
+        ThrowingHands = false;
+    end;
+});
+
+local NumberOfCommands: number = BaseModule.GetTableLength(BaseUI.AllCommandButtons);
+BaseUI.Notify("Loaded!", "Number of commands: "..NumberOfCommands);
