@@ -1,0 +1,1437 @@
+local Module = {};
+
+local Players = game:GetService("Players");
+local TweenService = game:GetService("TweenService");
+local RunService = game:GetService("RunService");
+local UserInputService = game:GetService("UserInputService");
+local LogService = game:GetService("LogService");
+
+local Camera = workspace.CurrentCamera;
+local LocalPlayer = Players.LocalPlayer;
+
+SETTINGS = {
+    Colors = {
+        CommandBarBGColor = Color3.fromRGB(30, 30, 30);
+        TextColor = Color3.new(1, 1, 1);
+        ScrollBarColor = Color3.new(0, 0, 0);
+        OpenerBGColor = Color3.fromRGB(30, 30, 30);
+        CommandListBGColor = Color3.fromRGB(40, 40, 40);
+        CommandBGColor = Color3.fromRGB(30, 30, 30);
+        DescriptionBGColor = Color3.fromRGB(30, 30, 30);
+        DescriptionBarColor = Color3.fromRGB(40, 40, 40);
+        ImageIconColor = Color3.new(1, 1, 1);
+        ExecutorBGColor = Color3.fromRGB(40, 40, 40);
+        ExecutorTopBarColor = Color3.fromRGB(30, 30, 30);
+        ExecutorCodeBGColor = Color3.fromRGB(30, 30, 30);
+        ConsoleTopBarColor = Color3.fromRGB(30, 30, 30);
+        ConsoleBGColor = Color3.new(0, 0, 0);
+        ConsoleErrorColor = Color3.new(1, 0, 0);
+        ConsoleWarningColor = Color3.new(1, 1, 0);
+        ConsoleInformationColor = Color3.new(1, 1, 1);
+        NotificationBGColor = Color3.fromRGB(40, 40, 40);
+        NotificationTitleBGColor = Color3.fromRGB(30, 30, 30);
+        ExecutorFileBGColor = Color3.fromRGB(40, 40, 40);
+        ExecutorFileTopBarColor = Color3.fromRGB(30, 30, 30);
+        ExecutorFileButtonColor = Color3.fromRGB(30, 30, 30);
+    };
+    CornerRadius = 8;
+    Prefix = {
+        Code = Enum.KeyCode.Semicolon;
+        Name = ";";
+    };
+    ScrollBar = {
+        Thickness = 6;
+        Transparency = 0;
+        Color = Color3.new(0, 0, 0);
+    };
+    Description = {
+        BarTransparency = 0.3;
+        BackgroundTransparency = 0.3;
+    };
+    Console = {
+        BGTransparency = 0.5;
+        TopBarTransparency = 0;
+    };
+    Notification = {
+        BGTransparency = 0;
+        TitleBGTransparency = 0;
+    };
+};
+
+Module.AllCommandButtons = {};
+
+local CreateInstance = function(ClassName: string, Parent: Instance?, Properties: {[string]: any}): Instance
+    local NewInstance = Instance.new(ClassName);
+    NewInstance.Parent = Parent;
+    for PropertyName, PropertySet in next, Properties do
+        NewInstance[PropertyName] = PropertySet;
+    end
+    return NewInstance;
+end
+
+local CreateCorner = function(InstanceParent: Instance)
+    local NewCorner = Instance.new("UICorner", InstanceParent);
+    NewCorner.CornerRadius = UDim.new(0, SETTINGS.CornerRadius);
+end
+
+local CreateTextScale = function(InstanceParent: TextLabel, MaxTextSize: number, ForceScale: boolean?)
+    InstanceParent.TextSize = MaxTextSize;
+    local NewTextScale = Instance.new("UITextSizeConstraint", InstanceParent);
+    NewTextScale.MaxTextSize = MaxTextSize;
+    NewTextScale.MinTextSize = 1;
+    if (ForceScale ~= false) then
+        InstanceParent.TextScaled = true;
+    end
+end
+
+local DragFrame = function(Frame: Frame)
+    local dragToggle = nil;
+	local dragInput = nil;
+	local dragStart = nil;
+    local startPos = nil;
+    local Delta = nil;
+    local Position = nil;
+	local updateInput = function(input)
+		Delta = input.Position - dragStart;
+		Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + Delta.X, startPos.Y.Scale, startPos.Y.Offset + Delta.Y);
+		TweenService:Create(Frame, TweenInfo.new(0.15), {Position = Position}):Play();
+	end
+	Frame.InputBegan:Connect(function(input)
+		if ((input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and UserInputService:GetFocusedTextBox() == nil) then
+			dragToggle = true;
+			dragStart = input.Position;
+			startPos = Frame.Position;
+			input.Changed:Connect(function()
+				if (input.UserInputState == Enum.UserInputState.End) then
+					dragToggle = false;
+				end
+			end)
+		end
+	end)
+	Frame.InputChanged:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			dragInput = input;
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if (input == dragInput and dragToggle) then
+			updateInput(input);
+		end
+	end)
+end
+
+local MainGui = CreateInstance("ScreenGui", LocalPlayer.PlayerGui, {
+    ResetOnSpawn = false;
+    IgnoreGuiInset = true;
+    DisplayOrder = 5000;
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
+});
+
+local CommandLineBG = CreateInstance("CanvasGroup", MainGui, {
+    BorderSizePixel = 1;
+    BackgroundColor3 = SETTINGS.Colors.CommandBarBGColor;
+    Size = UDim2.fromOffset(200, 20);
+    Position = UDim2.new(0, -200, 0.482, 0);
+});
+CreateCorner(CommandLineBG);
+
+local MainCommandLine = CreateInstance("TextBox", CommandLineBG, {
+    Size = UDim2.fromOffset(190, 18);
+    Position = UDim2.fromOffset(5, 1);
+    BorderSizePixel = 0;
+    PlaceholderColor3 = SETTINGS.Colors.TextColor;
+    TextColor3 = SETTINGS.Colors.TextColor;
+    Text = "";
+    ClearTextOnFocus = false;
+    BackgroundTransparency = 1;
+    PlaceholderText = "Press "..SETTINGS.Prefix.Name.." or type here";
+});
+CreateTextScale(MainCommandLine, 16);
+
+local MainOpener = CreateInstance("TextLabel", MainGui, {
+    BackgroundColor3 = SETTINGS.Colors.OpenerBGColor;
+    BorderSizePixel = 0;
+    Position = UDim2.new(0, 25, 0.482, 0);
+    Size = UDim2.fromOffset(40, 20);
+    TextColor3 = SETTINGS.Colors.TextColor;
+    Text = "333";
+});
+CreateCorner(MainOpener);
+CreateTextScale(MainOpener, 16);
+
+local ListsBG = CreateInstance("Frame", MainGui, {
+    ClipsDescendants = true;
+    Size = UDim2.fromOffset(200, 150);
+    Position = UDim2.new(0, -200, 0.537, 0);
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.CommandListBGColor;
+});
+CreateCorner(ListsBG);
+
+local MainCommandsList = CreateInstance("ScrollingFrame", ListsBG, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    ClipsDescendants = false;
+    Size = UDim2.fromOffset(190, 140);
+    Position = UDim2.fromOffset(5, 5);
+    AutomaticCanvasSize = Enum.AutomaticSize.XY;
+    ScrollBarImageColor3 = SETTINGS.ScrollBar.Color;
+    ScrollBarImageTransparency = SETTINGS.ScrollBar.Transparency;
+    ScrollBarThickness = SETTINGS.ScrollBar.Thickness;
+});
+MainCommandsList.BottomImage = MainCommandsList.MidImage;
+MainCommandsList.TopImage = MainCommandsList.MidImage;
+
+CreateInstance("UIListLayout", MainCommandsList, {
+    Padding = UDim.new(0, 5);
+    SortOrder = Enum.SortOrder.Name;
+    HorizontalAlignment = Enum.HorizontalAlignment.Center;
+    VerticalAlignment = Enum.VerticalAlignment.Top;
+});
+
+local DescriptionBG = CreateInstance("CanvasGroup", MainGui, {
+    Visible = false;
+    Size = UDim2.fromOffset(150, 75);
+    BackgroundTransparency = SETTINGS.Description.BackgroundTransparency;
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.DescriptionBGColor;
+    ZIndex = 10;
+});
+CreateCorner(DescriptionBG);
+
+local DescriptionBarBG = CreateInstance("Frame", DescriptionBG, {
+    BackgroundColor3 = SETTINGS.Colors.DescriptionBarColor;
+    BorderSizePixel = 0;
+    BackgroundTransparency = SETTINGS.Description.BarTransparency;
+    Size = UDim2.fromOffset(150, 15);
+});
+
+local MainDescriptionTitle = CreateInstance("TextLabel", DescriptionBarBG, {
+    TextColor3 = SETTINGS.Colors.TextColor;
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Text = "";
+    Size = UDim2.fromOffset(140, 15);
+    Position = UDim2.fromOffset(5, 0);
+});
+CreateTextScale(MainDescriptionTitle, 14);
+
+local MainDescriptionText = CreateInstance("TextLabel", DescriptionBarBG, {
+    TextColor3 = SETTINGS.Colors.TextColor;
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Text = "";
+    Size = UDim2.fromOffset(140, 50);
+    Position = UDim2.fromOffset(5, 18);
+    TextXAlignment = Enum.TextXAlignment.Left;
+    TextYAlignment = Enum.TextYAlignment.Top;
+});
+CreateTextScale(MainDescriptionText, 10);
+
+local MainSettingsButton = CreateInstance("ImageButton", MainGui, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(25, 25);
+    Position = UDim2.new(0, 25, 0.429, 0);
+    Image = "rbxassetid://9753762469";
+});
+
+local MainExecutorButton = CreateInstance("ImageButton", MainGui, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(25, 25);
+    Position = UDim2.new(0, 75, 0.429, 0);
+    Image = "rbxassetid://5595830734";
+});
+
+local MainConsoleButton = CreateInstance("ImageButton", MainGui, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(25, 25);
+    Position = UDim2.new(0, 25, 0.366, 0);
+    Image = "rbxassetid://18183476210";
+});
+
+local MainLogsButton = CreateInstance("ImageButton", MainGui, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(25, 25);
+    Position = UDim2.new(0, 75, 0.366, 0);
+    Image = "rbxassetid://18234768217";
+});
+
+local ExecutorDragBar = CreateInstance("Frame", MainGui, {
+    Visible = false;
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Size = UDim2.fromOffset(400, 25);
+    Position = UDim2.fromScale(0.35, 0.39);
+    ZIndex = 2;
+});
+CreateCorner(ExecutorDragBar);
+DragFrame(ExecutorDragBar);
+
+local ExecutorBG = CreateInstance("Frame", ExecutorDragBar, {
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.ExecutorBGColor;
+    Size = UDim2.fromOffset(400, 200);
+    ZIndex = 0;
+});
+CreateCorner(ExecutorBG);
+
+local ExecutorCodeBG = CreateInstance("Frame", ExecutorBG, {
+    BackgroundColor3 = SETTINGS.Colors.ExecutorCodeBGColor;
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(390, 165);
+    Position = UDim2.fromOffset(5, 30);
+    ClipsDescendants = true;
+});
+CreateCorner(ExecutorCodeBG);
+
+local ExecutorCodeScroll = CreateInstance("ScrollingFrame", ExecutorCodeBG, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    ScrollBarThickness = SETTINGS.ScrollBar.Thickness;
+    ScrollBarImageColor3 = SETTINGS.ScrollBar.Color;
+    ScrollBarImageTransparency = SETTINGS.ScrollBar.Transparency;
+    ClipsDescendants = false;
+    AutomaticCanvasSize = Enum.AutomaticSize.XY;
+    Size = UDim2.fromOffset(380, 155);
+    Position = UDim2.fromOffset(5, 5);
+});
+ExecutorCodeScroll.TopImage = ExecutorCodeScroll.MidImage;
+ExecutorCodeScroll.BottomImage = ExecutorCodeScroll.MidImage;
+
+local ExecutorCodeMain = CreateInstance("TextBox", ExecutorCodeScroll, {
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Size = UDim2.fromOffset(380, 1);
+    Text = "";
+    PlaceholderText = "Type code here...";
+    TextColor3 = SETTINGS.Colors.TextColor;
+    PlaceholderColor3 = SETTINGS.Colors.TextColor;
+    MultiLine = true;
+    ClearTextOnFocus = false;
+    AutomaticSize = Enum.AutomaticSize.XY;
+    TextXAlignment = Enum.TextXAlignment.Left;
+    TextYAlignment = Enum.TextYAlignment.Top;
+});
+CreateTextScale(ExecutorCodeMain, 10, false);
+
+local ExecutorTopBar = CreateInstance("Frame", ExecutorDragBar, {
+    Size = UDim2.fromOffset(400, 25);
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.ExecutorTopBarColor;
+});
+CreateCorner(ExecutorTopBar);
+
+local ExecutorClearCodeButton = CreateInstance("ImageButton", ExecutorTopBar, {
+    BackgroundTransparency = 1;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(12, 2);
+    Image = "rbxassetid://13967645129";
+    BorderSizePixel = 0;
+    ImageColor3 = SETTINGS.Colors.ImageIconColor;
+});
+
+local ExecutorRunCodeButton = CreateInstance("ImageButton", ExecutorTopBar, {
+    BackgroundTransparency = 1;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(367, 2);
+    Image = "rbxassetid://18169182766";
+    BorderSizePixel = 0;
+    ImageColor3 = SETTINGS.Colors.ImageIconColor;
+});
+
+local ExecutorSaveButton = CreateInstance("ImageButton", ExecutorTopBar, {
+    BackgroundTransparency = 1;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(173, 2);
+    Image = "rbxassetid://13967683571";
+    BorderSizePixel = 0;
+    ImageColor3 = SETTINGS.Colors.ImageIconColor;
+});
+
+local ExecutorLoadButton = CreateInstance("ImageButton", ExecutorTopBar, {
+    BackgroundTransparency = 1;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(206, 2);
+    Image = "rbxassetid://13967694747";
+    BorderSizePixel = 0;
+    ImageColor3 = SETTINGS.Colors.ImageIconColor;
+});
+
+local MainParameterList = CreateInstance("ScrollingFrame", ListsBG, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    ClipsDescendants = false;
+    Size = UDim2.fromOffset(190, 140);
+    Position = UDim2.fromOffset(5, 5);
+    AutomaticCanvasSize = Enum.AutomaticSize.XY;
+    ScrollBarImageColor3 = SETTINGS.ScrollBar.Color;
+    ScrollBarImageTransparency = SETTINGS.ScrollBar.Transparency;
+    ScrollBarThickness = SETTINGS.ScrollBar.Thickness;
+    Visible = false;
+});
+MainParameterList.BottomImage = MainParameterList.MidImage;
+MainParameterList.TopImage = MainParameterList.MidImage;
+
+CreateInstance("UIListLayout", MainParameterList, {
+    Padding = UDim.new(0, 5);
+    SortOrder = Enum.SortOrder.Name;
+    HorizontalAlignment = Enum.HorizontalAlignment.Center;
+    VerticalAlignment = Enum.VerticalAlignment.Top;
+});
+
+local ConsoleDragBar = CreateInstance("Frame", MainGui, {
+    BackgroundTransparency = 1;
+    Position = UDim2.new(0.291, 0, 0.068, 0);
+    Size = UDim2.fromOffset(400, 25);
+    BorderSizePixel = 0;
+    Visible = false;
+});
+CreateCorner(ConsoleDragBar);
+DragFrame(ConsoleDragBar);
+
+local ConsoleTopBar = CreateInstance("Frame", ConsoleDragBar, {
+    BackgroundColor3 = SETTINGS.Colors.ConsoleTopBarColor;
+    BackgroundTransparency = SETTINGS.Console.TopBarTransparency;
+    Size = UDim2.fromOffset(400, 25);
+    BorderSizePixel = 0;
+});
+CreateCorner(ConsoleTopBar);
+
+local ConsoleMinizeButton = CreateInstance("ImageButton", ConsoleTopBar, {
+    Position = UDim2.fromOffset(367, 2);
+    Size = UDim2.fromOffset(20, 20);
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Image = "rbxassetid://18182443210";
+    ImageColor3 = SETTINGS.Colors.ImageIconColor;
+});
+
+local ConsoleClearButton = CreateInstance("ImageButton", ConsoleTopBar, {
+    Position = UDim2.fromOffset(333, 2);
+    Size = UDim2.fromOffset(20, 20);
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Image = "rbxassetid://13967645129";
+    ImageColor3 = SETTINGS.Colors.ImageIconColor;
+});
+
+local ConsoleErrorView = CreateInstance("TextButton", ConsoleTopBar, {
+    BackgroundColor3 = Color3.new(1, 0, 0);
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(9, 2);
+    Text = "";
+});
+CreateCorner(ConsoleErrorView);
+
+local ConsoleWarningView = CreateInstance("TextButton", ConsoleTopBar, {
+    BackgroundColor3 = Color3.new(1, 1, 0);
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(42, 2);
+    Text = "";
+});
+CreateCorner(ConsoleWarningView);
+
+local ConsoleOutputView = CreateInstance("TextButton", ConsoleTopBar, {
+    BackgroundColor3 = Color3.new(1, 1, 1);
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(20, 20);
+    Position = UDim2.fromOffset(75, 2);
+    Text = "";
+});
+CreateCorner(ConsoleOutputView);
+
+local ConsoleBG = CreateInstance("Frame", ConsoleDragBar, {
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.ConsoleBGColor;
+    BackgroundTransparency = SETTINGS.Console.BGTransparency;
+    Size = UDim2.fromOffset(400, 200);
+    ZIndex = 0;
+});
+CreateCorner(ConsoleBG);
+
+local ConsoleMessageList = CreateInstance("ScrollingFrame", ConsoleBG, {
+    BorderSizePixel = 0;
+    BackgroundTransparency = 1;
+    Position = UDim2.fromOffset(5, 30);
+    Size = UDim2.fromOffset(390, 165);
+    AutomaticCanvasSize = Enum.AutomaticSize.Y;
+    CanvasSize = UDim2.new(0, 0, 0, 0);
+    ScrollBarImageTransparency = SETTINGS.ScrollBar.Transparency;
+    ScrollBarThickness = SETTINGS.ScrollBar.Thickness;
+    ScrollBarImageColor3 = SETTINGS.ScrollBar.Color;
+});
+ConsoleMessageList.TopImage = ConsoleMessageList.MidImage;
+ConsoleMessageList.BottomImage = ConsoleMessageList.MidImage;
+
+CreateInstance("UIListLayout", ConsoleMessageList, {
+    Padding = UDim.new(0, 5);
+    HorizontalAlignment = Enum.HorizontalAlignment.Center;
+    SortOrder = Enum.SortOrder.LayoutOrder;
+});
+
+local LoadFileDragBar = CreateInstance("Frame", MainGui, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    Position = UDim2.fromOffset(400, 400);
+    Size = UDim2.fromOffset(125, 20);
+    Visible = false;
+});
+DragFrame(LoadFileDragBar);
+
+local LoadFileBG = CreateInstance("CanvasGroup", LoadFileDragBar, {
+    BackgroundColor3 = SETTINGS.Colors.ExecutorFileBGColor;
+    BorderSizePixel = 0;
+    Size = UDim2.fromOffset(125, 180);
+});
+CreateCorner(LoadFileBG);
+
+local LoadFileTopBar = CreateInstance("TextLabel", LoadFileBG, {
+    BorderSizePixel = 1;
+    BackgroundColor3 = SETTINGS.Colors.ExecutorFileTopBarColor;
+    Text = "Load File";
+    TextColor3 = SETTINGS.Colors.TextColor;
+    Size = UDim2.fromOffset(125, 20);
+});
+CreateTextScale(LoadFileTopBar, 12);
+
+local LoadFileList = CreateInstance("ScrollingFrame", LoadFileBG, {
+    Position = UDim2.fromOffset(5, 25);
+    Size = UDim2.fromOffset(115, 150);
+    BackgroundTransparency = 1;
+    AutomaticCanvasSize = Enum.AutomaticSize.Y;
+    ScrollBarThickness = SETTINGS.ScrollBar.Thickness;
+    ScrollBarImageTransparency = SETTINGS.ScrollBar.Transparency;
+    ScrollBarImageColor3 = SETTINGS.ScrollBar.Color;
+    BorderSizePixel = 0;
+});
+LoadFileList.TopImage = LoadFileList.MidImage;
+LoadFileList.BottomImage = LoadFileList.MidImage;
+
+CreateInstance("UIListLayout", LoadFileList, {
+    Padding = UDim.new(0, 6);
+    SortOrder = Enum.SortOrder.Name;
+    HorizontalAlignment = Enum.HorizontalAlignment.Center;
+});
+
+local SaveFileDragBar = CreateInstance("Frame", MainGui, {
+    BackgroundTransparency = 1;
+    BorderSizePixel = 0;
+    Position = UDim2.fromOffset(550, 400);
+    Size = UDim2.fromOffset(125, 20);
+    Visible = false;
+});
+DragFrame(SaveFileDragBar);
+
+local SaveFileBG = CreateInstance("CanvasGroup", SaveFileDragBar, {
+    Size = UDim2.fromOffset(125, 100);
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.ExecutorFileBGColor;
+});
+CreateCorner(SaveFileBG);
+
+local SaveFileTopBar = CreateInstance("TextLabel", SaveFileBG, {
+    Size = UDim2.fromOffset(125, 20);
+    BackgroundColor3 = SETTINGS.Colors.ExecutorFileTopBarColor;
+    Text = "Save File";
+    TextColor3 = SETTINGS.Colors.TextColor;
+    BorderSizePixel = 0;
+});
+CreateTextScale(SaveFileTopBar, 12);
+
+local SaveFileInputName = CreateInstance("TextBox", SaveFileBG, {
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.ExecutorFileButtonColor;
+    Size = UDim2.fromOffset(115, 30);
+    Position = UDim2.fromOffset(5, 25);
+    ClearTextOnFocus = false;
+    MultiLine = false;
+    TextColor3 = SETTINGS.Colors.TextColor;
+    PlaceholderColor3 = SETTINGS.Colors.TextColor;
+    Text = "";
+    PlaceholderText = "File Name..";
+});
+CreateCorner(SaveFileInputName);
+CreateTextScale(SaveFileInputName, 10);
+
+local SaveFileSaveButton = CreateInstance("TextButton", SaveFileBG, {
+    BorderSizePixel = 0;
+    BackgroundColor3 = SETTINGS.Colors.ExecutorFileButtonColor;
+    Text = "Save";
+    TextColor3 = SETTINGS.Colors.TextColor;
+    Size = UDim2.fromOffset(115, 30);
+    Position = UDim2.fromOffset(5, 65);
+});
+CreateCorner(SaveFileSaveButton);
+CreateTextScale(SaveFileSaveButton, 10);
+
+local CurrentNotifyFrame = nil;
+local Notify = function(Title: string, Message: string)
+    local BackgroundFrame = CreateInstance("CanvasGroup", MainGui, {
+        BorderSizePixel = 0;
+        Size = UDim2.fromOffset(160, 75);
+        Position = UDim2.fromOffset(-160, Camera.ViewportSize.Y -25 - 75);
+        BackgroundColor3 = SETTINGS.Colors.NotificationBGColor;
+        BackgroundTransparency = SETTINGS.Notification.BGTransparency;
+    });
+    CreateCorner(BackgroundFrame);
+    
+    local TitleFrame = CreateInstance("TextLabel", BackgroundFrame, {
+        BackgroundTransparency = SETTINGS.Notification.TitleBGTransparency;
+        BackgroundColor3 = SETTINGS.Colors.NotificationTitleBGColor;
+        TextColor3 = SETTINGS.Colors.TextColor;
+        Size = UDim2.fromOffset(160, 15);
+        BorderSizePixel = 0;
+        Text = Title or "";
+    });
+    CreateTextScale(TitleFrame, 12);
+
+    local TextFrame = CreateInstance("TextLabel", BackgroundFrame, {
+        BackgroundTransparency = 1;
+        TextColor3 = SETTINGS.Colors.TextColor;
+        Size = UDim2.fromOffset(150, 50);
+        Position = UDim2.fromOffset(5, 20);
+        BorderSizePixel = 0;
+        Text = Message or "";
+    });
+    CreateTextScale(TextFrame, 10);
+
+    if (CurrentNotifyFrame ~= nil) then
+        local OldFrame = CurrentNotifyFrame;
+        CurrentNotifyFrame = nil;
+
+        task.spawn(function()
+            TweenService:Create(OldFrame, TweenInfo.new(0.4), {
+                Position = UDim2.fromOffset(25, Camera.ViewportSize.Y);
+            }):Play();
+            task.wait(1.1);
+            OldFrame:Destroy();
+        end)
+    end
+
+    CurrentNotifyFrame = BackgroundFrame;
+
+    TweenService:Create(CurrentNotifyFrame, TweenInfo.new(0.4), {
+        Position = UDim2.fromOffset(20, Camera.ViewportSize.Y - 25 - 75)
+    }):Play();
+
+    task.delay(3.5, function()
+        if (CurrentNotifyFrame == BackgroundFrame and CurrentNotifyFrame ~= nil) then
+            local OldFrame = CurrentNotifyFrame
+            CurrentNotifyFrame = nil;
+
+            TweenService:Create(OldFrame, TweenInfo.new(0.4), {
+                Position = UDim2.fromOffset(25, Camera.ViewportSize.Y);
+            }):Play();
+            task.wait(1.1);
+            OldFrame:Destroy();
+        end
+    end)
+end
+
+local Hovering = false;
+local ShowingCommandBar = false;
+local ShowingListsBG = false;
+local HideCountAttempt = 0;
+local Typing = false;
+
+local HideListsBG = function()
+    if (ShowingListsBG == false) then
+        return
+    end
+    ShowingListsBG = false;
+
+    local Old, New = 25, -200;
+    local Current = ListsBG.Position.X.Offset;
+    local Needs, Has = math.abs(New - Old), math.abs(Current - New);
+    local SpeedMultiplier = Has / Needs;
+
+    local CurrentPos = Current * 1000;
+    CurrentPos = math.round(CurrentPos) / 1000;
+
+    if (CurrentPos == Old) then
+        MainCommandsList.CanvasPosition = Vector2.new(0, 0);
+        MainParameterList.CanvasPosition = Vector2.new(0, 0);
+    end
+
+    TweenService:Create(ListsBG, TweenInfo.new(
+        0.2 * SpeedMultiplier
+    ), {
+        Position = UDim2.new(
+            0,
+            New,
+            ListsBG.Position.Y.Scale,
+            0
+        );
+    }):Play();
+end
+local HideCommandBar = function(SkipDelay: boolean?)
+    if (ShowingCommandBar == false or Hovering == true or Typing == true) then
+        return;
+    end
+    
+    HideCountAttempt += 1;
+    local Current = HideCountAttempt;
+
+    local Close =  function()
+        if (ShowingCommandBar == false or Current ~= HideCountAttempt or Hovering == true or Typing == true) then
+            return;
+        end
+        ShowingCommandBar = false;
+
+        HideListsBG();
+
+        local Old, New = 25, -200;
+        local Current = CommandLineBG.Position.X.Offset;
+        local Needs, Has = math.abs(New - Old), math.abs(Current - New);
+        local SpeedMultiplier = Has / Needs;
+
+        TweenService:Create(CommandLineBG, TweenInfo.new(
+            0.2 * SpeedMultiplier
+        ), {
+            Position = UDim2.new(
+                0,
+                New,
+                CommandLineBG.Position.Y.Scale,
+                0
+            );
+        }):Play();
+        TweenService:Create(MainOpener, TweenInfo.new(
+            0.2 * SpeedMultiplier
+        ), {
+            Position = UDim2.new(
+                0,
+                New + 225,
+                MainOpener.Position.Y.Scale,
+                0
+            );
+        }):Play();
+    end
+
+    if (SkipDelay == true) then
+        Close();
+    else
+        task.delay(1, Close);
+    end
+end
+local ShowCommandBar = function()
+    if (ShowingCommandBar == true) then
+        return;
+    end
+    ShowingCommandBar = true;
+
+    local Old, New = -200, 25;
+    local Current = CommandLineBG.Position.X.Offset;
+    local Needs, Has = math.abs(New - Old), math.abs(Current - New);
+    local SpeedMultiplier = Has / Needs;
+
+    TweenService:Create(CommandLineBG, TweenInfo.new(
+        0.2 * SpeedMultiplier
+    ), {
+        Position = UDim2.new(
+            0,
+            New,
+            CommandLineBG.Position.Y.Scale,
+            0
+        );
+    }):Play();
+    TweenService:Create(MainOpener, TweenInfo.new(
+        0.2 * SpeedMultiplier
+    ), {
+        Position = UDim2.new(
+            0,
+            New + 225,
+            MainOpener.Position.Y.Scale,
+            0
+        );
+    }):Play();
+end
+local ShowListsBG = function()
+    if (ShowingListsBG == true) then
+        return;
+    elseif (ShowingCommandBar == false) then
+        ShowCommandBar();
+        if (Hovering == false) then
+            HideCommandBar();
+        end
+    end
+    ShowingListsBG = true;
+
+    local Old, New = -200, 25;
+    local Current = ListsBG.Position.X.Offset;
+    local Needs, Has = math.abs(New - Old), math.abs(Current - New);
+    local SpeedMultiplier = Has / Needs;
+
+    TweenService:Create(ListsBG, TweenInfo.new(
+        0.2 * SpeedMultiplier
+    ), {
+        Position = UDim2.new(
+            0,
+            New,
+            ListsBG.Position.Y.Scale,
+            0
+        );
+    }):Play();
+end
+
+MainOpener.MouseEnter:Connect(function()
+    Hovering = true;
+    ShowCommandBar();
+end);
+MainOpener.MouseLeave:Connect(function()
+    Hovering = false;
+    HideCommandBar();
+end)
+
+MainCommandLine.MouseEnter:Connect(function()
+    Hovering = true;
+    ShowCommandBar();
+end);
+MainCommandLine.MouseLeave:Connect(function()
+    Hovering = false;
+    HideCommandBar();
+end)
+
+ListsBG.MouseEnter:Connect(function()
+    Hovering = true;
+    ShowListsBG();
+end);
+ListsBG.MouseLeave:Connect(function()
+    Hovering = false;
+    HideCommandBar();
+end)
+
+local AddDescriptionFrame = function(Frame: Frame, Title: string, Description: string)
+    Frame.MouseEnter:Connect(function()
+        MainDescriptionTitle.Text = Title;
+        MainDescriptionText.Text = Description;
+        DescriptionBG.Visible = true;
+    end)
+    Frame.MouseLeave:Connect(function()
+        if (MainDescriptionText.Text == Description and MainDescriptionTitle.Text == Title) then
+            DescriptionBG.Visible = false;
+            MainDescriptionTitle.Text = "";
+            MainDescriptionText.Text = "";
+        end
+    end)
+end
+
+local GetTableLength = function(Table: {any}): number
+    local Length = 0;
+    for _ in next, Table do
+        Length += 1;
+    end
+    return Length;
+end
+
+local FilterCommandFromPrefix = function(Command: string): string
+    local Prefix = SETTINGS.Prefix.Name;
+
+    local PrefixStart = string.sub(Command, 1, 1);
+    if (PrefixStart == Prefix) then
+        Command = string.sub(Command, 2, -1);
+    end
+
+    local PrefixEnd = string.sub(Command, -1, -1);
+    if (PrefixEnd == Prefix) then
+        Command = string.sub(Command, 1, -2);
+    end
+
+    return Command;
+end
+
+local GetCurrentTyped = function(Typed: string): {Command: string?, Parameters: {string?}}
+    local Command = "";
+    local Parameters = {};
+
+    local SplitText = string.split(Typed, " ");
+    local Length = GetTableLength(SplitText);
+    if (Length > 0) then
+        Command = FilterCommandFromPrefix(SplitText[1]);
+        
+        if (Length > 1) then
+            for I = 2, Length do
+                Parameters[I-1] = SplitText[I];
+            end
+        end
+    else
+        return {
+            Command = nil;
+            Parameters = {};
+        };
+    end
+
+    return {
+        Command = Command;
+        Parameters = Parameters;
+    };
+end
+
+local GetButtonCommandNameFromTypedCommand = function(TypedCommand: string): string?
+    local CommandNames: {string} = {};
+    for CommandName, _ in next, Module.AllCommandButtons do
+        table.insert(CommandNames, CommandName);
+    end
+    table.sort(CommandNames, function(a, b)
+        return a < b;
+    end)
+
+    TypedCommand = string.lower(TypedCommand);
+    for _, CommandName in next, CommandNames do
+        if (CommandName == TypedCommand or string.find(CommandName, TypedCommand) == 1) then
+            return CommandName;
+        end
+    end
+
+    return nil;
+end
+
+local UpdateParameters = function(TypedParameter: string?, Parameters: {string}?)
+    for _, child in next, MainParameterList:GetChildren() do
+        if (child:IsA("TextLabel")) then
+            child:Destroy();
+        end
+    end
+    MainParameterList.CanvasPosition = Vector2.new(0, 0);
+
+    if (TypedParameter == nil or Parameters == nil) then
+        MainParameterList.Visible = false;
+        MainCommandsList.CanvasPosition = Vector2.new(0, 0);
+        MainCommandsList.Visible = true;
+
+        return;
+    end
+
+    TypedParameter = string.lower(TypedParameter);
+
+    MainCommandsList.Visible = false;
+
+    table.sort(Parameters, function(a,b)
+        return a < b;
+    end)
+
+    for _, Parameter in next, Parameters do
+        local LoweredParameter = string.lower(Parameter);
+        local Found = string.find(LoweredParameter, TypedParameter);
+        if ((TypedParameter ~= "") and (not Found or Found > 1)) then
+            continue;
+        end
+
+        local NewLabel = Instance.new("TextLabel", MainParameterList);
+        NewLabel.TextColor3 = SETTINGS.Colors.TextColor;
+        NewLabel.BorderSizePixel = 0;
+        NewLabel.TextWrapped = false;
+        NewLabel.Text = Parameter;
+        NewLabel.Name = Parameter;
+        NewLabel.Size = UDim2.fromOffset(170, 18);
+        NewLabel.BackgroundTransparency = 1;
+        CreateTextScale(NewLabel, 12);
+    end
+
+    MainParameterList.Visible = true;
+end
+
+MainCommandLine.Focused:Connect(function()
+    Typing = true;
+    ShowListsBG();
+end)
+MainCommandLine.FocusLost:Connect(function(HitEnter)
+    Typing = false;
+
+    if (HitEnter == false) then
+        HideCommandBar();
+        return;
+    else
+        HideCommandBar(true);
+    end
+
+    local CurrentTyped = GetCurrentTyped(MainCommandLine.Text);
+    local TypedCommand = string.lower(CurrentTyped.Command);
+
+    local DataFound = Module.AllCommandButtons[TypedCommand];
+    if (not DataFound and string.gsub(TypedCommand, " ", "") ~= "") then
+        local ButtonCommandNameFound = GetButtonCommandNameFromTypedCommand(TypedCommand);
+        if (ButtonCommandNameFound) then
+            DataFound = Module.AllCommandButtons[ButtonCommandNameFound];
+        end
+    end
+    if (DataFound and DataFound.Function) then
+        if (CurrentTyped.Parameters ~= nil) then
+            local UsingParameters = {};
+            for I, V in next, CurrentTyped.Parameters do
+                if (string.gsub(V, " ", "") == "") then
+                    continue;
+                end
+                UsingParameters[I] = V;
+            end
+            task.spawn(pcall, DataFound.Function, unpack(UsingParameters));
+        else
+            task.spawn(pcall, DataFound.Function);
+        end
+    end
+
+    MainCommandLine.Text = "";
+    UpdateParameters(nil, nil);
+end)
+MainCommandLine:GetPropertyChangedSignal("Text"):Connect(function()
+    MainCommandsList.CanvasPosition = Vector2.new(0, 0);
+    MainParameterList.CanvasPosition = Vector2.new(0, 0);
+    if (string.gsub(MainCommandLine.Text, " ", "") == "") then
+        for _, ButtonArgs in next, Module.AllCommandButtons do
+            ButtonArgs.Button.Parent = MainCommandsList;
+        end
+        UpdateParameters(nil, nil);
+        return;
+    end
+
+    local SplitText = string.split(MainCommandLine.Text, " ");
+    local SplitLength = GetTableLength(SplitText);
+    local NewText = "";
+
+    local SpecialCharacters = {
+        "$"; "%"; "^"; "*";	"("; ")";
+        "."; "["; "]"; "+";	"-"; "?";
+    };
+
+    local Count = 0;
+    for _, V in next, SplitText do
+        for _, x in next, SpecialCharacters do
+            V = string.gsub(V, "%"..x, "");
+        end
+
+        if (string.gsub(V, " ", "") == "") then
+            continue;
+        end
+        Count += 1;
+
+        NewText = NewText..V;
+
+        if (Count < SplitLength) then
+            NewText = NewText.." ";
+        end
+    end
+    
+    if (NewText ~= MainCommandLine.Text) then
+        MainCommandLine.Text = NewText;
+        return;
+    end
+
+    local CurrentTyped = GetCurrentTyped(NewText);
+    local TypedCommand = string.lower(CurrentTyped.Command);
+    local ParametersLength = GetTableLength(CurrentTyped.Parameters);
+
+    for ButtonCommandName, ButtonArgs in next, Module.AllCommandButtons do
+        local Found = string.find(ButtonCommandName, TypedCommand);
+        if ((ParametersLength > 0) or (not Found or Found ~= 1)) then
+            ButtonArgs.Button.Parent = nil;
+        else
+            ButtonArgs.Button.Parent = MainCommandsList;
+        end
+    end
+
+    if (ParametersLength > 0) then
+        local DataFound = Module.AllCommandButtons[TypedCommand];
+        if (not DataFound) then
+            local ButtonCommandName = GetButtonCommandNameFromTypedCommand(TypedCommand);
+            if (ButtonCommandName) then
+                DataFound = Module.AllCommandButtons[ButtonCommandName];
+            end
+        end
+
+        if (DataFound == nil or DataFound.ParameterFunctions == nil) then
+            UpdateParameters(nil, nil);
+            return;
+        end
+
+        local FunctionsCount = GetTableLength(DataFound.ParameterFunctions);
+        if (FunctionsCount <= 0) then
+            UpdateParameters(nil, nil);
+            return;
+        end
+
+        local CurrentParameterFunction = DataFound.ParameterFunctions[ParametersLength];
+        if (CurrentParameterFunction == nil) then
+            UpdateParameters(nil, nil);
+            return;
+        end
+
+        local Parameters: {string} = CurrentParameterFunction();
+        local CurrentParameter = CurrentTyped.Parameters[ParametersLength];
+        UpdateParameters(CurrentParameter, Parameters);
+    else
+        UpdateParameters(nil, nil);
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local MousePosition = UserInputService:GetMouseLocation();
+    DescriptionBG.Position = UDim2.fromOffset(
+        MousePosition.X,
+        MousePosition.Y - DescriptionBG.AbsoluteSize.Y
+    );
+end);
+
+UserInputService.InputBegan:Connect(function(Input, GPE)
+    if (GPE) then
+        return;
+    end
+
+    if (Input.KeyCode == SETTINGS.Prefix.Code) then
+        MainCommandLine:CaptureFocus();
+    end
+end)
+
+local ExecutorFileFoundButtonConnections: {RBXScriptConnection} = {};
+local HideLoadFileUI = function()
+    LoadFileDragBar.Visible = false;
+
+    for I, V in next, ExecutorFileFoundButtonConnections do
+        pcall(function()
+            V:Disconnect();
+        end)
+        ExecutorFileFoundButtonConnections[I] = nil;
+    end
+
+    for _, Child in next, LoadFileList:GetChildren() do
+        if (Child:IsA("TextButton")) then
+            Child:Destroy();
+        end
+    end
+
+    LoadFileList.CanvasPosition = Vector2.new(0, 0);
+end
+local ShowLoadFileUI = function()
+    if (not isfolder("333UIFolder")) then
+        makefolder("333UIFolder");
+    end
+
+    local Files: {string} = listfiles("333UIFolder");
+
+    for _, FileName in next, Files do
+        local ShortFileName = string.gsub(FileName, ".txt", "");
+        ShortFileName = string.gsub(ShortFileName, "333UIFolder\\\\", "");
+
+        local Button = CreateInstance("TextButton", LoadFileList, {
+            BorderSizePixel = 0;
+            Name = ShortFileName;
+            Text = ShortFileName;
+            TextColor3 = SETTINGS.Colors.TextColor;
+            Size = UDim2.fromOffset(100, 25);
+            BackgroundColor3 = SETTINGS.Colors.ExecutorFileButtonColor;
+        });
+        CreateCorner(Button);
+        CreateTextScale(Button, 10);
+
+        local Conn = Button.Activated:Connect(function()
+            if (isfolder("333UIFolder")) then
+                local FileContents: string? = readfile(FileName);
+                if (FileContents ~= nil) then
+                    ExecutorCodeMain.Text = FileContents;
+                end
+            end
+
+            HideLoadFileUI();
+        end)
+        table.insert(ExecutorFileFoundButtonConnections, Conn);
+    end
+
+    LoadFileDragBar.Visible = true;
+end
+
+local AddConsoleMessage = function(MessageType: Enum.MessageType, Message: string)
+    local CanvasSizeMain = ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y;
+    local CanvasPositionMain = ConsoleMessageList.CanvasPosition.Y;
+
+    local TextFrame = Instance.new("TextLabel", ConsoleMessageList);
+    TextFrame.BackgroundTransparency = 1;
+    TextFrame.Size = UDim2.fromOffset(370, 20);
+    TextFrame.AutomaticSize = Enum.AutomaticSize.Y;
+    TextFrame.TextWrapped = true;
+    CreateTextScale(TextFrame, 10, false);
+
+    if (MessageType == Enum.MessageType.MessageError) then
+        TextFrame.TextColor3 = Color3.new(1, 0, 0);
+        TextFrame.Text = "Error: "..Message;
+        TextFrame.Name = "Error";
+
+        if (ConsoleErrorView.BackgroundColor3 == Color3.new(0.5, 0, 0)) then
+            TextFrame.Visible = false;
+        end
+    elseif (MessageType == Enum.MessageType.MessageWarning) then
+        TextFrame.TextColor3 = Color3.new(1, 1, 0);
+        TextFrame.Text = "Warning: "..Message;
+        TextFrame.Name = "Warning";
+
+        if (ConsoleWarningView.BackgroundColor3 == Color3.new(0.5, 0.5, 0)) then
+            TextFrame.Visible = false;
+        end
+    elseif (MessageType == Enum.MessageType.MessageOutput) then
+        TextFrame.TextColor3 = Color3.new(1, 1, 1);
+        TextFrame.Text = "Output: "..Message;
+        TextFrame.Name = "Output";
+
+        if (ConsoleOutputView.BackgroundColor3 == Color3.new(0.5, 0.5, 0.5)) then
+            TextFrame.Visible = false;
+        end
+    else
+        TextFrame:Destroy();
+        return;
+    end
+
+    CanvasPositionMain = math.round(CanvasPositionMain * 10) / 10;
+    CanvasSizeMain = math.round(CanvasSizeMain * 10) / 10
+    if (CanvasPositionMain >= CanvasSizeMain) then
+        ConsoleMessageList.CanvasPosition = Vector2.new(0, ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y);
+    end
+end
+
+MainExecutorButton.Activated:Connect(function()
+    ExecutorDragBar.Visible = not ExecutorDragBar.Visible;
+    ExecutorCodeScroll.CanvasPosition = Vector2.new(0, 0);
+end)
+ExecutorClearCodeButton.Activated:Connect(function()
+    ExecutorCodeMain.Text = "";
+end)
+ExecutorLoadButton.Activated:Connect(function()
+    if (SaveFileDragBar.Visible == true) then
+        return;
+    end
+
+    if (LoadFileDragBar.Visible == true) then
+        HideLoadFileUI();
+    else
+        ShowLoadFileUI();
+    end
+end)
+ExecutorSaveButton.Activated:Connect(function()
+    if (LoadFileDragBar.Visible == true) then
+        return;
+    end
+
+    SaveFileDragBar.Visible = not SaveFileDragBar.Visible;
+    SaveFileInputName.Text = "";
+end)
+SaveFileSaveButton.Activated:Connect(function()
+    SaveFileDragBar.Visible = false;
+    local FileName = SaveFileInputName.Text;
+    SaveFileInputName.Text = "";
+    
+    local SpecialCharacters = {
+        "$"; "%"; "^"; "*";	"("; ")";
+        "."; "["; "]"; "+";	"-"; "?";
+    };
+
+    for _, x in next, SpecialCharacters do
+        FileName = string.gsub(FileName, "%"..x, "");
+    end
+
+    if (not isfolder("333UIFolder")) then
+        makefolder("333UIFolder");
+    end
+
+    writefile("333UIFolder/"..FileName..".txt", ExecutorCodeMain.Text);
+end)
+ExecutorRunCodeButton.Activated:Connect(function()
+    if (string.gsub(ExecutorCodeMain.Text, " ", "") == "") then
+        return;
+    end
+
+    local Code = loadstring(ExecutorCodeMain.Text);
+    local Successful, Callback = pcall(Code);
+    if (not Successful) then
+        AddConsoleMessage(Enum.MessageType.MessageError, "EXECUTOR CODE HAD AN ERROR RUNNING\n"..Callback.."\n----");
+    end
+end)
+
+LogService.MessageOut:Connect(function(Message, MessageType)
+    AddConsoleMessage(MessageType, Message);
+end)
+
+MainConsoleButton.Activated:Connect(function()
+    ConsoleDragBar.Visible = not ConsoleDragBar.Visible;
+end)
+ConsoleMinizeButton.Activated:Connect(function()
+    ConsoleBG.Visible = not ConsoleBG.Visible;
+end)
+ConsoleClearButton.Activated:Connect(function()
+    for _, Child in next, ConsoleMessageList:GetChildren() do
+        if (Child:IsA("TextLabel")) then
+            Child:Destroy();
+        end
+    end
+end)
+ConsoleErrorView.Activated:Connect(function()
+    local CanvasSizeMain = ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y;
+    local CanvasPositionMain = ConsoleMessageList.CanvasPosition.Y;
+
+    if (ConsoleErrorView.BackgroundColor3 == Color3.new(1, 0, 0)) then
+        ConsoleErrorView.BackgroundColor3 = Color3.new(0.5, 0, 0);
+
+        for _, Child in next, ConsoleMessageList:GetChildren() do
+            if (Child:IsA("TextLabel") and Child.Name == "Error") then
+                Child.Visible = false;
+            end
+        end
+    else
+        ConsoleErrorView.BackgroundColor3 = Color3.new(1, 0, 0);
+
+        for _, Child in next, ConsoleMessageList:GetChildren() do
+            if (Child:IsA("TextLabel") and Child.Name == "Error") then
+                Child.Visible = true;
+            end
+        end
+    end
+
+    CanvasPositionMain = math.round(CanvasPositionMain * 10) / 10;
+    CanvasSizeMain = math.round(CanvasSizeMain * 10) / 10
+    if (CanvasPositionMain >= CanvasSizeMain) then
+        ConsoleMessageList.CanvasPosition = Vector2.new(0, ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y);
+    end
+
+    CanvasPositionMain = math.round(CanvasPositionMain * 10) / 10;
+    CanvasSizeMain = math.round(CanvasSizeMain * 10) / 10
+    if (CanvasPositionMain >= CanvasSizeMain) then
+        ConsoleMessageList.CanvasPosition = Vector2.new(0, ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y);
+    end
+end)
+ConsoleWarningView.Activated:Connect(function()
+    local CanvasSizeMain = ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y;
+    local CanvasPositionMain = ConsoleMessageList.CanvasPosition.Y;
+
+    if (ConsoleWarningView.BackgroundColor3 == Color3.new(1, 1, 0)) then
+        ConsoleWarningView.BackgroundColor3 = Color3.new(0.5, 0.5, 0);
+
+        for _, Child in next, ConsoleMessageList:GetChildren() do
+            if (Child:IsA("TextLabel") and Child.Name == "Warning") then
+                Child.Visible = false;
+            end
+        end
+    else
+        ConsoleWarningView.BackgroundColor3 = Color3.new(1, 1, 0);
+
+        for _, Child in next, ConsoleMessageList:GetChildren() do
+            if (Child:IsA("TextLabel") and Child.Name == "Warning") then
+                Child.Visible = true;
+            end
+        end
+    end
+
+    CanvasPositionMain = math.round(CanvasPositionMain * 10) / 10;
+    CanvasSizeMain = math.round(CanvasSizeMain * 10) / 10
+    if (CanvasPositionMain >= CanvasSizeMain) then
+        ConsoleMessageList.CanvasPosition = Vector2.new(0, ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y);
+    end
+end)
+ConsoleOutputView.Activated:Connect(function()
+    local CanvasSizeMain = ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y;
+    local CanvasPositionMain = ConsoleMessageList.CanvasPosition.Y;
+
+    if (ConsoleOutputView.BackgroundColor3 == Color3.new(1, 1, 1)) then
+        ConsoleOutputView.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5);
+
+        for _, Child in next, ConsoleMessageList:GetChildren() do
+            if (Child:IsA("TextLabel") and Child.Name == "Output") then
+                Child.Visible = false;
+            end
+        end
+    else
+        ConsoleOutputView.BackgroundColor3 = Color3.new(1, 1, 1);
+
+        for _, Child in next, ConsoleMessageList:GetChildren() do
+            if (Child:IsA("TextLabel") and Child.Name == "Output") then
+                Child.Visible = true;
+            end
+        end
+    end
+
+    CanvasPositionMain = math.round(CanvasPositionMain * 10) / 10;
+    CanvasSizeMain = math.round(CanvasSizeMain * 10) / 10
+    if (CanvasPositionMain >= CanvasSizeMain) then
+        ConsoleMessageList.CanvasPosition = Vector2.new(0, ConsoleMessageList.AbsoluteCanvasSize.Y - ConsoleMessageList.AbsoluteWindowSize.Y);
+    end
+end)
+
+AddDescriptionFrame(MainSettingsButton, "Settings", "Opens the settings menu for customization, keybinds, etc.");
+AddDescriptionFrame(MainExecutorButton, "Executor", "A built in executor, can be used with keybinds via settings.");
+AddDescriptionFrame(ExecutorClearCodeButton, "Clear", "Clears the current code.");
+AddDescriptionFrame(ExecutorLoadButton, "Load", "Loads a file with code you've saved.");
+AddDescriptionFrame(ExecutorSaveButton, "Save", "Saves your code to a file.");
+AddDescriptionFrame(ExecutorRunCodeButton, "Run", "Will run your code, any errors will show in the console.");
+AddDescriptionFrame(MainConsoleButton, "Console", "Opens the built in console.");
+AddDescriptionFrame(ConsoleErrorView, "Error View", "Toggles the visibility of Error messages.");
+AddDescriptionFrame(ConsoleWarningView, "Warning View", "Toggles the visibility of Warning messages.");
+AddDescriptionFrame(ConsoleOutputView, "Output View", "Toggles the visibility of Output messages.");
+AddDescriptionFrame(ConsoleMinizeButton, "Minimize", "Toggles visibility of the console background.");
+AddDescriptionFrame(ConsoleClearButton, "Clear", "Clears all messages.");
+AddDescriptionFrame(MainLogsButton, "Logs", "Lets you see logs of player joins and chats.");
+
+Module.ChangeKeybind = function(NewBind: Enum.KeyCode)
+    local Name = UserInputService:GetStringForKeyCode(NewBind);
+    if (Name == nil or Name == "" or Name == " ") then
+        Name = NewBind.Name;
+    end
+    SETTINGS.Prefix.Code = NewBind;
+    SETTINGS.Prefix.Name = Name;
+    MainCommandLine.PlaceholderText = "Press "..Name.." or type here";
+end
+
+Module.CreateCommand = function(Args: {CommandName: string, Description: string?, Function: any, Parameters: {[number]: any}?, DisplayText: string?})
+    local CommandName = string.gsub(Args.CommandName, " ", "");
+    if (Module.AllCommandButtons[string.lower(CommandName)] ~= nil) then
+        warn("Command Already Exists: "..string.lower(CommandName));
+        return;
+    end
+
+    local NewTextButton = Instance.new("TextButton", MainCommandsList);
+    NewTextButton.BackgroundColor3 = SETTINGS.Colors.CommandBGColor;
+    NewTextButton.BorderSizePixel = 0;
+    NewTextButton.TextWrapped = false;
+    NewTextButton.Text = Args.DisplayText or CommandName;
+    NewTextButton.Name = CommandName;
+    NewTextButton.Size = UDim2.fromOffset(170, 18);
+    NewTextButton.TextColor3 = SETTINGS.Colors.TextColor;
+    CreateTextScale(NewTextButton, 12);
+    CreateCorner(NewTextButton);
+
+    Module.AllCommandButtons[string.lower(CommandName)] = {
+        Button = NewTextButton;
+        ParameterFunctions = Args.Parameters;
+        Function = Args.Function;
+    };
+
+    local Description = Args.Description or "Empty Description.";
+    AddDescriptionFrame(NewTextButton, CommandName, Description);
+
+    NewTextButton.Activated:Connect(function()
+        if (string.lower(MainCommandLine.Text) == string.lower(CommandName)) then
+            return;
+        end
+        MainCommandLine.Text = CommandName;
+        MainCommandLine:CaptureFocus();
+    end)
+end
+
+Module.Print = function(Message: string)
+    AddConsoleMessage(Enum.MessageType.MessageOutput, Message);
+end
+
+Module.Warn = function(Message: string)
+    AddConsoleMessage(Enum.MessageType.MessageWarning, Message);
+end
+
+Module.Error = function(Message: string)
+    AddConsoleMessage(Enum.MessageType.MessageError, Message);
+end
+
+Module.Notify = Notify;
+
+Module.Destroy = function()
+    MainGui:Destroy();
+end
+
+return Module;
