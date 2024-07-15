@@ -1,0 +1,473 @@
+local Module = {};
+
+local Players = game:GetService("Players");
+local RunService = game:GetService("RunService");
+
+local LocalPlayer = Players.LocalPlayer;
+
+Module.STORAGE = {
+    NoClipEnabled = false;
+    Flinging = false;
+    NoClippedParts = {};
+};
+
+Module.ChangeDumpedFunctions = function(FuncName: string, NewFunction): number
+    if (not getgc or not hookfunction or not debug.getinfo) then
+        return 0;
+    end
+    local ChangedCount = 0;
+
+    for _, v in next, getgc() do
+        if (typeof(v) == "function") then
+            if (debug.getinfo(v).Name == FuncName) then
+                hookfunction(debug.getinfo(v).func, NewFunction);
+                ChangedCount += 1;
+            end
+        end
+    end
+
+    return ChangedCount;
+end
+
+Module.ToggleNoClip = function(Force: boolean?): boolean
+    if (Force ~= nil) then
+        if (Module.STORAGE.NoClipEnabled == Force) then
+            return Force;
+        end
+        Module.STORAGE.NoClipEnabled = Force;
+    else
+        Module.STORAGE.NoClipEnabled = not Module.STORAGE.NoClipEnabled;
+    end
+
+    if (Module.STORAGE.NoClipEnabled == true) then
+        local Conn;
+        Conn = RunService.RenderStepped:Connect(function()
+            if (Module.STORAGE.NoClipEnabled ~= true) then
+                pcall(function()
+                    Conn:Disconnect();
+                end)
+                Conn = nil;
+                return;
+            end
+
+            local Char = LocalPlayer.Character;
+            if (Char) then
+                for _, Desc in next, Char:GetDescendants() do
+                    if (Desc:IsA("BasePart") and Desc.CanCollide == true) then
+                        Desc.CanCollide = false;
+                        if (not table.find(Module.STORAGE.NoClippedParts, Desc)) then
+                            table.insert(Module.STORAGE.NoClippedParts, Desc);
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        for _, v in next, Module.STORAGE.NoClippedParts do
+            if (v == nil) then
+                continue;
+            end
+            v.CanCollide = true;
+        end
+        table.clear(Module.STORAGE.NoClippedParts);
+    end
+
+    return Module.STORAGE.NoClipEnabled;
+end
+
+Module.GetPlayerRoot = function(Player: Player): BasePart?
+    local Char = Player.Character;
+    if (Char) then
+        local Hrp: BasePart? = Char:FindFirstChild("HumanoidRootPart");
+        if (Hrp and Hrp:IsA("BasePart")) then
+            return Hrp;
+        end
+    end
+
+    return nil;
+end
+
+Module.GetPlayerHumanoid = function(Player: Player): Humanoid?
+    local Char = Player.Character;
+    if (Char) then
+        return Char:FindFirstChildOfClass("Humanoid");
+    end
+
+    return nil;
+end
+
+Module.GetNearestPlayer = function(): Player?
+    local NearestPlayer = nil;
+    local Nearest = math.huge;
+
+    for _, Player in next, Players:GetPlayers() do
+        if (Player == LocalPlayer) then
+            continue;
+        end
+
+        local Root = Module.GetPlayerRoot(Player);
+        local Root2 = Module.GetPlayerRoot(LocalPlayer);
+        if (Root and Root2) then
+            local Dis = (Root.Position - Root2.Position).Magnitude;
+            if (Dis < Nearest) then
+                NearestPlayer = Player;
+                Nearest = Dis;
+            end
+        end
+    end
+
+    return NearestPlayer;
+end
+
+Module.FlingPlayer = function(Player: Player)
+    if (Module.STORAGE.Flinging == true) then
+        return;
+    end
+
+    local TargetRoot = Module.GetPlayerRoot(Player);
+    local LocalRoot = Module.GetPlayerRoot(LocalPlayer);
+    local LocalChar = LocalPlayer.Character;
+    local LocalHum = Module.GetPlayerHumanoid(LocalPlayer);
+    local TargetHum = Module.GetPlayerHumanoid(Player);
+    if (not TargetRoot or not LocalRoot or not LocalChar or not LocalHum or not TargetHum) then
+        return;
+    end
+
+    Module.STORAGE.Flinging = true;
+    local OldCFrame = LocalRoot.CFrame;
+
+    local HumDied = function()
+        Module.STORAGE.Flinging = false;
+    end
+    local DieConn1 = LocalHum.Died:Once(HumDied);
+    local DieConn2 = TargetHum.Died:Once(HumDied);
+
+    for _, Desc in next, LocalChar:GetDescendants() do
+        if (Desc:IsA("BasePart")) then
+            Desc.CustomPhysicalProperties = PhysicalProperties.new(math.huge, 0.3, 0.5);
+        end
+    end
+    task.wait(0.1);
+    Module.ToggleNoClip(true);
+
+    for _, Desc in pairs(LocalChar:GetDescendants()) do
+        if (Desc:IsA("BasePart")) then
+            Desc.Massless = true;
+            Desc.AssemblyLinearVelocity = Vector3.new(0, 0, 0);
+        end
+    end
+
+    local BP = Instance.new("BodyPosition", LocalRoot);
+    BP.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
+    BP.P = BP.P*10;
+
+    local BV = Instance.new("BodyAngularVelocity", LocalRoot);
+    BV.AngularVelocity = Vector3.new(0,99999,0);
+    BV.MaxTorque = Vector3.new(0,math.huge,0);
+    BV.P = math.huge;
+
+    LocalRoot.CFrame = TargetRoot.CFrame;
+    task.wait();
+
+    local MaxVelocity = 300;
+    local HitMaxVelocity = function(): boolean
+        local Vel = TargetRoot.AssemblyAngularVelocity;
+        local X = math.abs(Vel.X);
+        local Y = math.abs(Vel.Y);
+        local Z = math.abs(Vel.Z);
+
+        if (X > MaxVelocity or Y > MaxVelocity or Z > MaxVelocity) then
+            return true;
+        end
+
+        return false;
+    end
+
+    local Running = RunService.RenderStepped:Connect(function()
+        if (Module.STORAGE.Flinging == false
+        or not TargetRoot
+        or not TargetHum
+        or TargetHum.Health <= 0
+        or TargetHum.SeatPart ~= nil
+        or TargetRoot.Anchored == true
+        or HitMaxVelocity() == true) then
+            Module.STORAGE.Flinging = false;
+            return;
+        end
+
+        BP.Position = TargetRoot.Position + (TargetHum.MoveDirection * (TargetHum.WalkSpeed/2));
+    end)
+
+    task.delay(3, function()
+        Module.STORAGE.Flinging = false;
+    end)
+
+    repeat
+        if (not LocalRoot or not BV) then
+            Module.STORAGE.Flinging = false;
+            break;
+        end
+
+        BV.AngularVelocity = Vector3.new(9999,99999,0);
+        task.wait(0.2);
+        BV.AngularVelocity = Vector3.new(0,0,0);
+        task.wait(0.1);
+    until (Module.STORAGE.Flinging == false);
+
+    pcall(function()
+        DieConn1:Disconnect();
+    end)
+    DieConn1 = nil;
+    pcall(function()
+        DieConn2:Disconnect();
+    end)
+    DieConn2 = nil;
+    pcall(function()
+        Running:Disconnect();
+    end)
+    Running = nil;
+
+    BP.MaxForce = Vector3.new(0, 0, 0);
+    BV.MaxTorque = Vector3.new(0, 0, 0);
+
+    task.wait();
+
+    BP:Destroy();
+    BV:Destroy();
+
+    task.wait();
+
+    LocalRoot.Anchored = true;
+    LocalRoot.CFrame = OldCFrame;
+    
+    for _, Desc in pairs(LocalChar:GetDescendants()) do
+        if (Desc:IsA("BasePart")) then
+            Desc.Massless = false;
+            Desc.AssemblyLinearVelocity = Vector3.new(0, 0, 0);
+            Desc.AssemblyAngularVelocity = Vector3.new(0, 0, 0);
+            Desc.Velocity = Vector3.new(0, 0, 0);
+        end
+    end
+
+    task.wait(0.2);
+    
+    LocalRoot.AssemblyAngularVelocity = Vector3.new(1, 1, 1);
+    LocalRoot.Velocity = Vector3.new(1, 1, 1);
+
+    LocalRoot.Anchored = false;
+
+    Module.ToggleNoClip(false);
+end
+
+Module.TeleportToPlayer = function(Player: Player): boolean
+    local LocalRoot = Module.GetPlayerRoot(LocalPlayer);
+    local TargetRoot = Module.GetPlayerRoot(Player);
+    if (LocalRoot and TargetRoot) then
+        LocalRoot.CFrame = TargetRoot.CFrame;
+        return true;
+    end
+
+    return false;
+end
+
+Module.FireAllClickDetectors = function(): boolean
+    if (not fireclickdetector) then
+        return false;
+    end
+    for _, Desc in next, workspace:GetDescendants() do
+        if (Desc:IsA("ClickDetector")) then
+            fireclickdetector(Desc);
+        end
+    end
+    return true;
+end
+
+Module.LoopAnimation = function(Anim: AnimationTrack)
+    if (Anim.IsPlaying == false) then
+        Anim:Play();
+    end
+    local Conn = Anim.Stopped:Connect(function()
+        Anim:Play();
+    end)
+    
+    return function()
+        pcall(function()
+            Conn:Disconnect();
+        end)
+        Conn = nil;
+        Anim:Stop();
+    end
+end
+
+Module.LoadAnimation = function(AnimId: number): AnimationTrack?
+    local Hum = Module.GetPlayerHumanoid(LocalPlayer);
+    if (not Hum) then
+        return nil;
+    end
+    local Ar = Hum:FindFirstChildOfClass("Animator");
+    local Anim = Instance.new("Animation");
+    Anim.AnimationId = "rbxassetid://"..AnimId;
+    local Playing = Ar:LoadAnimation(Anim);
+    return Playing;
+end
+
+Module.GetFurthestPlayer = function(): Player?
+    local FurthestPlayer = nil;
+    local Furthest = 0;
+
+    for _, Player in next, Players:GetPlayers() do
+        if (Player == LocalPlayer) then
+            continue;
+        end
+
+        local Root = Module.GetPlayerRoot(Player);
+        local Root2 = Module.GetPlayerRoot(LocalPlayer);
+        if (Root and Root2) then
+            local Dis = (Root.Position - Root2.Position).Magnitude;
+            if (Dis > Furthest) then
+                FurthestPlayer = Player;
+                Furthest = Dis;
+            end
+        end
+    end
+
+    return FurthestPlayer;
+end
+
+Module.GetRandomPlayer = function(): Player?
+    local Players = Players:GetPlayers();
+    local Length = Module.GetTableLength(Players);
+
+    if (Length <= 1) then
+        return nil;
+    end
+
+    local Random = Players[math.random(1, Length)];
+    repeat
+        Random = Players[math.random(1, Length)];
+    until (Random ~= LocalPlayer);
+
+    return Random;
+end
+
+Module.GetPlayerFromTargetName = function(TargetName: string): Player?
+    local Short = string.lower(TargetName);
+    if (Short == "me") then
+        return LocalPlayer;
+    elseif (Short == "nearest" or string.find("nearest", Short) == 1) then
+        return Module.GetNearestPlayer();
+    elseif (Short == "furthest" or string.find("furthest", Short) == 1) then
+        return Module.GetFurthestPlayer();
+    elseif (Short == "random" or string.find("random", Short) == 1) then
+        return Module.GetRandomPlayer();
+    end
+
+    for _, Player in next, Players:GetPlayers() do
+        local Short2 = string.lower(Player.Name);
+        local Short3 = string.lower(Player.DisplayName);
+        if ((Short2 == Short)
+            or (Short3 == Short)
+            or (string.find(Short2, Short))
+            or (string.find(Short3, Short))) then
+            return Player;
+        end
+    end
+    return nil;
+end
+
+Module.CreateLocalScript = function(Function, Parent: Instance?)
+    local NewScript = Instance.new("LocalScript", Parent);
+    local env = getfenv(Function);
+    local newenv = setmetatable({}, {
+        __index = function(self, k)
+            if (k == "script") then
+                return NewScript;
+            else
+                return env[k];
+            end
+        end
+    });
+    setfenv(Function, newenv);
+    task.spawn(pcall, Function);
+end
+
+Module.GetUnanchoredParts = function(): { number: {Dist: number?, Part: BasePart?}? }?
+    local Hrp = Module.GetPlayerRoot(LocalPlayer);
+    if (not Hrp) then
+        return nil;
+    end
+
+    local Chars = {};
+    for _, Player in next, Players:GetPlayers() do
+        if (Player.Character) then
+            table.insert(Chars, Player.Character);
+        end
+    end
+
+    local UnanchoredParts = {};
+
+    for _, Desc in next, workspace:GetDescendants() do
+        if (Desc and Desc:IsA("BasePart")) then
+            local Good = true;
+            for _, PChar in next, Chars do
+                if (Desc:IsDescendantOf(PChar)) then
+                    Good = false;
+                    continue;
+                end
+            end
+    
+            local Parts = Desc:GetConnectedParts();
+            for _, Part in next, Parts do
+                if (Part.Anchored == true) then
+                    Good = false;
+                    continue;
+                end
+            end
+
+            if (Desc.Parent:FindFirstChildOfClass("Humanoid") or Desc.Parent.Parent:FindFirstChildOfClass("Humanoid")) then
+                Good = false;
+            end
+
+            if (Good == false) then
+                continue;
+            end
+    
+            local Dis = math.round((Desc.Position - Hrp.Position).Magnitude);
+            if (Dis >= 2000) then
+                continue;
+            end
+            if (UnanchoredParts[Dis] == nil) then
+                UnanchoredParts[Dis] = Desc;
+            end
+        end
+    end
+
+    local SortedTable: {number: {Dist: number?, Part: BasePart?}?} = {};
+
+    local Max = 0;
+    for Dis, _ in next, UnanchoredParts do
+        if (Dis > Max) then
+            Max = Dis;
+        end
+    end
+    for I = 1, Max do
+        if (UnanchoredParts[I] ~= nil) then
+            table.insert(SortedTable, {
+                Part = UnanchoredParts[I];
+                Dist = I;
+            });
+        end
+    end
+
+    return SortedTable;
+end
+
+Module.GetTableLength = function(T: {any}): number
+    local Length = 0;
+    for _ in next, T do
+        Length += 1;
+    end
+    return Length;
+end
+
+return Module;
