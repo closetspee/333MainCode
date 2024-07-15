@@ -1,5 +1,5 @@
-local BaseModuleURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule?token=GHSAT0AAAAAACU3DLVQBL3GNINET5VT72L6ZUUP6XA";
-local BaseUIURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI?token=GHSAT0AAAAAACU3DLVQIZHBZO4URSH7TXJOZUUP6XQ";
+local BaseModuleURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule";
+local BaseUIURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI";
 
 local BaseModule = loadstring(game:HttpGet(BaseModuleURL))();
 local BaseUI = loadstring(game:HttpGet(BaseUIURL))();
