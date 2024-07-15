@@ -2,7 +2,7 @@ local BaseModuleURL = "https://raw.githubusercontent.com/closetspee/333MainCode/
 local BaseUIURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI?token=GHSAT0AAAAAACU3DLVQIZHBZO4URSH7TXJOZUUP6XQ";
 
 local BaseModule = loadstring(game:HttpGet(BaseModuleURL))();
-local BaseUI = loadstring(game:HttpGet("BaseUIURL))();
+local BaseUI = loadstring(game:HttpGet(BaseUIURL))();
 
 local Players = game:GetService("Players");
 local UserInputService = game:GetService("UserInputService");
