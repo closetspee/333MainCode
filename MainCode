@@ -1,8 +1,5 @@
-local BaseModuleURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule";
-local BaseUIURL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI";
-
-local BaseModule = loadstring(game:HttpGet(BaseModuleURL))();
-local BaseUI = loadstring(game:HttpGet(BaseUIURL))();
+local BaseModule = loadfile("BaseModule333.lua")();
+local BaseUI = loadfile("BaseUI333.lua")();
 
 local Players = game:GetService("Players");
 local UserInputService = game:GetService("UserInputService");
@@ -89,10 +86,6 @@ BaseUI.CreateCommand({
         if (not TargetPlayer or TargetPlayer == LocalPlayer) then
             return;
         end
-        local LocalRoot: BasePart? = BaseModule.GetPlayerRoot(LocalPlayer);
-        if (not LocalRoot) then
-            return;
-        end
 
         Pivot = Pivot or "";
         Pivot = string.lower(Pivot);
@@ -107,13 +100,15 @@ BaseUI.CreateCommand({
 
         local TargetRoot = BaseModule.GetPlayerRoot(TargetPlayer);
         if (ForcePivot ~= true and TargetRoot) then
-            LocalRoot.CFrame = TargetRoot.CFrame;
+            local Goto = CFrame.lookAt((TargetRoot.CFrame * CFrame.new(0, 0, -4)).Position, TargetRoot.Position);
+            BaseModule.TeleportToCF(Goto, true);
             return;
         end
 
         local TargetChar = TargetPlayer.Character;
         if (ForcePivot ~= false and TargetChar) then
-            LocalRoot.CFrame = CFrame.new(TargetChar.WorldPivot.Position);
+            local Goto = CFrame.new(TargetChar.WorldPivot.Position);
+            BaseModule.TeleportToCF(Goto, true);
         end
     end;
     Parameters = {
@@ -326,19 +321,7 @@ BaseUI.CreateCommand({
 
         for _, Desc in next, game:GetDescendants() do
             if (Desc:IsA("Seat")) then
-                if (Force ~= nil) then
-                    if (Force == true) then
-                        Desc.Parent = workspace;
-                    else
-                        Desc.Parent = ReplicatedStorage;
-                    end
-                else
-                    if (Desc.Parent == ReplicatedStorage) then
-                        Desc.Parent = workspace;
-                    else
-                        Desc.Parent = ReplicatedStorage;
-                    end
-                end
+                Desc.CanTouch = Toggle or not Desc.CanTouch;
             end
         end
     end;
@@ -443,6 +426,22 @@ BaseUI.CreateCommand({
         end
         Hum.JumpPower = Jump;
         Hum.UseJumpPower = true;
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "HipHeight";
+    DisplayText = "HipHeight [number]";
+    Description = "Changes your hip height.";
+    Function = function(HipHeight)
+        if (not tonumber(HipHeight)) then
+            return;
+        end
+        HipHeight = tonumber(HipHeight);
+        local Hum: Humanoid? = BaseModule.GetPlayerHumanoid(LocalPlayer);
+        if (not Hum) then
+            return;
+        end
+        Hum.HipHeight = HipHeight;
     end;
 });
 BaseUI.CreateCommand({
@@ -839,6 +838,15 @@ BaseUI.CreateCommand({
     end;
 });
 BaseUI.CreateCommand({
+    CommandName = "ReloadCode";
+    Description = "Reloads the UI and all the code.";
+    Function = function()
+        BaseUI.Destroy();
+        task.wait();
+        loadfile("MainPower333.lua")();
+    end;
+});
+BaseUI.CreateCommand({
     CommandName = "JoinGamePlace";
     DisplayText = "JoinGame [PlaceId]";
     Function = function(Id)
@@ -977,6 +985,71 @@ BaseUI.CreateCommand({
     Function = function()
         ThrowingHands = false;
     end;
+});
+BaseUI.CreateCommand({
+    CommandName = "FreezeAnims";
+    Description = "Freezes your current animations.";
+    Function = BaseModule.FreezeAnimations;
+});
+BaseUI.CreateCommand({
+    CommandName = "UnFreezeAnims";
+    Description = "UnFreezes your current animations.";
+    Function = BaseModule.UnFreezeAnimations;
+});
+BaseUI.CreateCommand({
+    CommandName = "StopAnims";
+    Description = "Stops your current animations.";
+    Function = BaseModule.StopAnimations;
+});
+BaseUI.CreateCommand({
+    CommandName = "BreakAnims";
+    Description = "Stops your current animations and destroys your movement animations.";
+    Function = BaseModule.BreakAnimations;
+});
+BaseUI.CreateCommand({
+    CommandName = "PlayAnimation";
+    DisplayText = "PlayAnimation [ID]";
+    Description = "Plays an animation from an animation ID";
+    Function = function(ID)
+        if (not ID or not tonumber(ID)) then
+            BaseUI.Notify("Error!", "Invalid ID Format.");
+            return;
+        end
+        ID = tonumber(ID);
+
+        BaseModule.StopAnimations();
+        local Anim = BaseModule.LoadAnimation(ID);
+        Anim:Play(0);
+    end
+});
+local EmoteFuncs = {
+    ["tpose"] = function()
+        local Anim: AnimationTrack? = BaseModule.LoadAnimation(10714347453);
+        if (Anim) then
+            Anim:Play();
+            Anim:AdjustSpeed(0);
+            Anim.TimePosition = 0.75;
+        end
+    end;
+};
+BaseUI.CreateCommand({
+    CommandName = "Emote";
+    DisplayText = "Emote [Emote]";
+    Function = function(Emote)
+        if (not Emote or not EmoteFuncs[Emote]) then
+            BaseUI.Notify("Error!", "Invalid emote.");
+            return;
+        end
+        BaseModule.StopAnimations();
+        EmoteFuncs[Emote]();
+    end;
+    Parameters = {
+        [1] = function()
+            return {
+                "tpose";
+            };
+        end;
+    };
 });
 
 local NumberOfCommands: number = BaseModule.GetTableLength(BaseUI.AllCommandButtons);
