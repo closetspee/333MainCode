@@ -11,6 +11,21 @@ Module.STORAGE = {
     NoClippedParts = {};
 };
 
+Module.GetDirectPlayerPosition = function(Player: Player): Vector3?
+    local Pos = nil;
+
+    local Char = Player.Character;
+    if (Char) then
+        local Hrp: BasePart? = Char:FindFirstChild("HumanoidRootPart");
+        local Hum = Char:FindFirstChildOfClass("Humanoid");
+        if (Hrp and Hum) then
+            Pos = Hrp.Position + (Hum.MoveDirection * (Hum.WalkSpeed / 3));
+        end
+    end
+
+    return Pos;
+end
+
 Module.ChangeDumpedFunctions = function(FuncName: string, NewFunction): number
     if (not getgc or not hookfunction or not debug.getinfo) then
         return 0;
@@ -85,6 +100,19 @@ Module.GetPlayerRoot = function(Player: Player): BasePart?
     end
 
     return nil;
+end
+
+Module.TeleportToCF = function(CF: CFrame, RealTeleport: boolean?)
+    local Root = Module.GetPlayerRoot(LocalPlayer);
+    if (not Root) then
+        return;
+    end
+
+    if (RealTeleport == true) then
+        Root.CFrame = CFrame.new(0, math.pi * 10000, 0);
+        task.wait(0.05);
+    end
+    Root.CFrame = CF;
 end
 
 Module.GetPlayerHumanoid = function(Player: Player): Humanoid?
@@ -309,6 +337,56 @@ Module.LoadAnimation = function(AnimId: number): AnimationTrack?
     Anim.AnimationId = "rbxassetid://"..AnimId;
     local Playing = Ar:LoadAnimation(Anim);
     return Playing;
+end
+
+Module.StopAnimations = function()
+    local Hum = Module.GetPlayerHumanoid(LocalPlayer);
+    if (not Hum) then
+        return;
+    end;
+    local Ar = Hum:FindFirstChildOfClass("Animator");
+        
+    for _, Anim in next, Ar:GetPlayingAnimationTracks() do
+        Anim:Stop(0);
+    end
+end
+
+Module.BreakAnimations = function()
+    local Char = LocalPlayer.Character;
+    if (not Char) then
+        return;
+    end
+    local AnimateScript = Char:FindFirstChild("Animate");
+
+    if (AnimateScript) then
+        AnimateScript:Destroy();
+    end
+
+    Module.StopAnimations();
+end
+
+Module.UnFreezeAnimations = function()
+    local Hum = Module.GetPlayerHumanoid(LocalPlayer);
+    if (not Hum) then
+        return;
+    end;
+    local Ar = Hum:FindFirstChildOfClass("Animator");
+        
+    for _, Anim in next, Ar:GetPlayingAnimationTracks() do
+        Anim:AdjustSpeed(1);
+    end
+end
+
+Module.FreezeAnimations = function()
+    local Hum = Module.GetPlayerHumanoid(LocalPlayer);
+    if (not Hum) then
+        return;
+    end;
+    local Ar = Hum:FindFirstChildOfClass("Animator");
+    
+    for _, Anim in next, Ar:GetPlayingAnimationTracks() do
+        Anim:AdjustSpeed(0);
+    end
 end
 
 Module.GetFurthestPlayer = function(): Player?
