@@ -1,10 +1,12 @@
-local BaseModule = loadfile("BaseModule333.lua")();
-local BaseUI = loadfile("BaseUI333.lua")();
+local BaseModuleLink = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule";
+local BaseUILink = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI";
+
+local BaseModule = loadstring(game:HttpGet(BaseModuleLink))();
+local BaseUI = loadstring(game:HttpGet(BaseUILink))();
 
 local Players = game:GetService("Players");
 local UserInputService = game:GetService("UserInputService");
 local TeleportService = game:GetService("TeleportService");
-local ReplicatedStorage = game:GetService("ReplicatedStorage");
 local HttpService = game:GetService("HttpService");
 
 local LocalPlayer = Players.LocalPlayer;
@@ -308,17 +310,6 @@ BaseUI.CreateCommand({
     DisplayText = "ToggleSeats [Toggle]?";
     Description = "Toggles seats if you're able to sit in them or not. Useful for flinging.";
     Function = function(Toggle: string)
-        local Force = nil;
-
-        if (Toggle ~= nil) then
-            Toggle = string.lower(Toggle);
-            if (Toggle == "true" or string.find("true", Toggle) == 1) then
-                Force = true;
-            elseif (Toggle == "false" or string.find("false", Toggle) == 1) then
-                Force = false;
-            end
-        end
-
         for _, Desc in next, game:GetDescendants() do
             if (Desc:IsA("Seat")) then
                 Desc.CanTouch = Toggle or not Desc.CanTouch;
@@ -843,7 +834,8 @@ BaseUI.CreateCommand({
     Function = function()
         BaseUI.Destroy();
         task.wait();
-        loadfile("MainPower333.lua")();
+        local URL = "https://raw.githubusercontent.com/closetspee/333MainCode/main/MainCode";
+        loadstring(game:HttpGet(URL))();
     end;
 });
 BaseUI.CreateCommand({
@@ -925,6 +917,14 @@ BaseUI.CreateCommand({
     Function = function()
         BaseUI.Notify("Loading", "Loading dex...");
         loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))();
+    end;
+});
+BaseUI.CreateCommand({
+    CommandName = "InfiniteYield";
+    Description = "Loads Infinite Yield.";
+    Function = function()
+        BaseUI.Notify("Loading", "Loading IY...");
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))();
     end;
 });
 local ThrowingHands = false;
