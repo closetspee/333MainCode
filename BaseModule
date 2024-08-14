@@ -548,4 +548,109 @@ Module.GetTableLength = function(T: {any}): number
     return Length;
 end
 
+Module.Connections = {};
+Module.ConnectionTriggers = {};
+local ConnectionStorage = {};
+
+local AddingConnections = {
+    "PlayerDied";
+    "PlayerRespawned";
+};
+
+for _, ConnectionName in next, AddingConnections do
+    ConnectionStorage[ConnectionName] = {
+        Main = {};
+        Once = {};
+    };
+    local Storage = ConnectionStorage[ConnectionName];
+    local MainData = {};
+    local TriggerData = {};
+
+    function MainData:Connect(F)
+        if (not F or typeof(F) ~= "function") then
+            return {};
+        end
+
+        table.insert(Storage.Main, F);
+
+        local ReturnData = {};
+        function ReturnData:Break()
+            for I, Func in next, Storage.Main do
+                if (Func == F) then
+                    table.remove(Storage.Main, I);
+                end
+            end
+        end
+
+        return ReturnData;
+    end
+
+    function MainData:Once(F)
+        if (not F or typeof(F) ~= "function") then
+            return {};
+        end
+
+        table.insert(Storage.Once, F);
+
+        local ReturnData = {};
+        function ReturnData:Break()
+            for I, Func in next, Storage.Once do
+                if (Func == F) then
+                    table.remove(Storage.Once, I);
+                end
+            end
+        end
+
+        return ReturnData;
+    end
+
+    function MainData:Wait()
+        local CB = nil;
+        CB = MainData:Once(function(...)
+            CB = {...};
+        end)
+
+        repeat
+            task.wait();
+        until (CB ~= nil);
+
+        return unpack(CB);
+    end
+
+    function TriggerData:Fire(...)
+        for _, Func in next, Storage.Main do
+            task.spawn(pcall, Func, ...);
+        end
+        for I, Func in next, Storage.Once do
+            task.spawn(pcall, Func, ...);
+        end
+        table.clear(Storage.Once);
+    end
+
+    Module.Connections[ConnectionName] = MainData;
+    Module.ConnectionTriggers[ConnectionName] = TriggerData;
+end
+
+local PlayerFound = function(Player: Player)
+    local CharFound = function(Char: Model)
+        local Hum = Char:WaitForChild("Humanoid");
+        Hum.Died:Connect(function()
+            Module.ConnectionTriggers.PlayerDied:Fire(Player);
+        end)
+    end
+    if (Player.Character) then
+        CharFound(Player.Character);
+    end
+    Player.CharacterAdded:Connect(function(Char)
+        CharFound(Char);
+
+        Module.ConnectionTriggers.PlayerRespawned:Fire(Player, Char);
+    end)
+end
+
+for _, Player in next, Players:GetPlayers() do
+    PlayerFound(Player);
+end
+Players.PlayerAdded:Connect(PlayerFound);
+
 return Module;
