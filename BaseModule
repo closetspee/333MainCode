@@ -1,3 +1,5 @@
+--https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule
+
 local Module = {};
 
 local Players = game:GetService("Players");
@@ -546,6 +548,14 @@ Module.GetTableLength = function(T: {any}): number
         Length += 1;
     end
     return Length;
+end
+
+Module.Ungroup = function(ParentInst: Folder | Model)
+    local StartingParent = ParentInst.Parent;
+    for _, Child in next, ParentInst:GetChildren() do
+        Child.Parent = StartingParent;
+    end
+    ParentInst:Destroy();
 end
 
 Module.Connections = {};
