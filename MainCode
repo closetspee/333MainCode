@@ -1,3 +1,5 @@
+--https://raw.githubusercontent.com/closetspee/333MainCode/main/MainCode
+
 local BaseModuleLink = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseModule";
 local BaseUILink = "https://raw.githubusercontent.com/closetspee/333MainCode/main/BaseUI";
 
@@ -159,6 +161,16 @@ BaseUI.CreateCommand({
 local BingBongActive = false;
 BaseUI.CreateCommand({
     CommandName = "BingBong";
+    DisplayText = "BingBong (V2.5)";
+    Description = "Loop fling every player. (Requires collisions)";
+    Function = function()
+        BingBongActive = not BingBongActive;
+    end
+});
+--[[
+local BingBongActive = false;
+BaseUI.CreateCommand({
+    CommandName = "BingBong";
     DisplayText = "BingBong (V2)";
     Description = "Ultimate server destruction. (Requires Player Collisions)";
     Function = function()
@@ -276,6 +288,7 @@ BaseUI.CreateCommand({
         end
     end;
 });
+]]
 BaseUI.CreateCommand({
     CommandName = "DestroyInstances";
     DisplayText = "DestroyInstances [Class Name]";
@@ -460,6 +473,14 @@ BaseUI.CreateCommand({
                     Val = false;
                 elseif (Val == "nil") then
                     Val = nil;
+                else
+                    local NewValue;
+                    local IsValue = pcall(function()
+                        NewValue = loadstring("return "..Val)();
+                    end)
+                    if (IsValue and NewValue ~= nil) then
+                        Val = NewValue;
+                    end
                 end
                 table.insert(Parameters, Val);
             end
@@ -754,8 +775,8 @@ BaseUI.CreateCommand({
         end
     end;
 });
-local ESPInstances: {Instance} = {};
-local ESPConnections: {RBXScriptConnection} = {};
+local ESPMainModel;
+local ESPConnections: {RBXScriptConnection?} = {};
 local ESPEnabled = false;
 BaseUI.CreateCommand({
     CommandName = "ToggleESP";
@@ -764,51 +785,30 @@ BaseUI.CreateCommand({
         ESPEnabled = not ESPEnabled;
 
         if (ESPEnabled == true) then
+            ESPMainModel = Instance.new("Model", workspace);
+            ESPMainModel.Name = "_ESPMainModel";
+
+            local Highlight = Instance.new("Highlight", ESPMainModel);
+            Highlight.OutlineTransparency = 1;
+            Highlight.FillColor = Color3.new(1, 1, 1);
+            Highlight.FillTransparency = 0.5;
+
             local PlayerFound = function(Player: Player)
-                if (Player == LocalPlayer) then
-                    return;
-                end
                 local CharFound = function(Char: Model)
-                    local NewHighlight = Instance.new("Highlight", Char);
-                    NewHighlight.FillColor = Color3.new(1,1,1);
-                    NewHighlight.FillTransparency = 0.5;
-                    NewHighlight.OutlineTransparency = 1;
-                    NewHighlight.Adornee = Char;
-                    NewHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop;
-                    table.insert(ESPInstances, NewHighlight);
-
-                    local Head = Char:FindFirstChild("Head");
-                    if (not Head) then
-                        task.wait(0.3);
-                        Head = Char:FindFirstChild("Head");
-                        if (not Head) then
-                            return;
-                        end
-                    end
-                    
-                    local NewBill = Instance.new("BillboardGui", Head);
-                    NewBill.AlwaysOnTop = true;
-                    NewBill.Adornee = Head;
-                    NewBill.Size = UDim2.fromScale(1, 1);
-                    NewBill.StudsOffset = Vector3.new(0, 2, 0);
-                    NewBill.ClipsDescendants = false;
-                    table.insert(ESPInstances, NewBill);
-
-                    local NewLabel = Instance.new("TextLabel", NewBill);
-                    NewLabel.BackgroundTransparency = 1;
-                    NewLabel.TextColor3 = Color3.new(1, 1, 1);
-                    NewLabel.Size = UDim2.fromScale(1, 1);
-                    NewLabel.Text = Player.Name;
-                    NewLabel.BorderSizePixel = 0;
+                    Char.Parent = ESPMainModel or workspace;
                 end
+
                 if (Player.Character) then
                     CharFound(Player.Character);
                 end
                 local Conn = Player.CharacterAdded:Connect(CharFound);
                 table.insert(ESPConnections, Conn);
             end
+
             for _, Player in next, Players:GetPlayers() do
-                PlayerFound(Player);
+                if (Player ~= LocalPlayer) then
+                    PlayerFound(Player);
+                end
             end
             local Conn = Players.PlayerAdded:Connect(PlayerFound);
             table.insert(ESPConnections, Conn);
@@ -820,10 +820,8 @@ BaseUI.CreateCommand({
                 ESPConnections[I] = nil;
             end
 
-            for _, V in next, ESPInstances do
-                if (V ~= nil) then
-                    V:Destroy();
-                end
+            if (ESPMainModel ~= nil) then
+                BaseModule.Ungroup(ESPMainModel);
             end
         end
     end;
@@ -1051,6 +1049,10 @@ BaseUI.CreateCommand({
         end;
     };
 });
+
+BaseModule.Connections.PlayerDied:Connect(function(Player: Player)
+    print(Player.Name, "Has Died!");
+end)
 
 local NumberOfCommands: number = BaseModule.GetTableLength(BaseUI.AllCommandButtons);
 BaseUI.Notify("Loaded!", "Number of commands: "..NumberOfCommands);
