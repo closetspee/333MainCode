@@ -69,12 +69,18 @@ BaseUI.CreateCommand({
     };
 });
 BaseUI.CreateCommand({
-    CommandName = "FlingNearest";
-    Description = "Attempts to fling the nearest player.";
-    Function = function()
+    CommandName = "FlingNearest [Force]?";
+    Description = "Attempts to fling the nearest player. Default Force = 1.";
+    Function = function(Force)
         local Nearest: Player? = BaseModule.GetNearestPlayer();
         if (Nearest) then
-            BaseModule.FlingPlayer(Nearest);
+            if (Force and tonumber(Force)) then
+                Force = tonumber(Force);
+            else
+                Force = 1;
+            end
+
+            BaseModule.FlingPlayer(Nearest, Force);
         end
     end;
 });
@@ -132,10 +138,10 @@ BaseUI.CreateCommand({
     };
 });
 BaseUI.CreateCommand({
-    CommandName = "FlingPlayer";
+    CommandName = "FlingPlayer [Force]?";
     DisplayText = "FlingPlayer [User]";
-    Description = "Flings the player if possible. (Requires player collisions)";
-    Function = function(TargetName: string?)
+    Description = "Flings the player if possible. Default Force = 1. (Requires player collisions)";
+    Function = function(TargetName: string?, Force)
         if (not TargetName) then
             return;
         end
@@ -143,7 +149,12 @@ BaseUI.CreateCommand({
         if (not Player or BaseModule.STORAGE.Flinging == true or Player == LocalPlayer) then
             return;
         end
-        BaseModule.FlingPlayer(Player);
+        if (Force and tonumber(Force)) then
+            Force = tonumber(Force);
+        else
+            Force = 1;
+        end
+        BaseModule.FlingPlayer(Player, Force);
     end;
     Parameters = {
         [1] = function()
@@ -165,6 +176,12 @@ BaseUI.CreateCommand({
     Description = "Loop fling every player. (Requires collisions)";
     Function = function()
         BingBongActive = not BingBongActive;
+
+        if (BingBongActive == false) then
+            return;
+        end
+
+        -- Main bing bong code goes here
     end
 });
 --[[
