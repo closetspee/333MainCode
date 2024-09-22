@@ -169,22 +169,7 @@ BaseUI.CreateCommand({
         end;
     };
 });
-local BingBongActive = false;
-BaseUI.CreateCommand({
-    CommandName = "BingBong";
-    DisplayText = "BingBong (V2.5)";
-    Description = "Loop fling every player. (Requires collisions)";
-    Function = function()
-        BingBongActive = not BingBongActive;
 
-        if (BingBongActive == false) then
-            return;
-        end
-
-        -- Main bing bong code goes here
-    end
-});
---[[
 local BingBongActive = false;
 BaseUI.CreateCommand({
     CommandName = "BingBong";
@@ -305,7 +290,7 @@ BaseUI.CreateCommand({
         end
     end;
 });
-]]
+
 BaseUI.CreateCommand({
     CommandName = "DestroyInstances";
     DisplayText = "DestroyInstances [Class Name]";
