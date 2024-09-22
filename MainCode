@@ -69,7 +69,8 @@ BaseUI.CreateCommand({
     };
 });
 BaseUI.CreateCommand({
-    CommandName = "FlingNearest [Force]?";
+    CommandName = "FlingNearest";
+    DisplayText = "FlingNearest [Force]?";
     Description = "Attempts to fling the nearest player. Default Force = 1.";
     Function = function(Force)
         local Nearest: Player? = BaseModule.GetNearestPlayer();
@@ -79,7 +80,6 @@ BaseUI.CreateCommand({
             else
                 Force = 1;
             end
-
             BaseModule.FlingPlayer(Nearest, Force);
         end
     end;
@@ -138,8 +138,8 @@ BaseUI.CreateCommand({
     };
 });
 BaseUI.CreateCommand({
-    CommandName = "FlingPlayer [Force]?";
-    DisplayText = "FlingPlayer [User]";
+    CommandName = "FlingPlayer";
+    DisplayText = "FlingPlayer [User] [Force]?";
     Description = "Flings the player if possible. Default Force = 1. (Requires player collisions)";
     Function = function(TargetName: string?, Force)
         if (not TargetName) then
@@ -838,6 +838,12 @@ BaseUI.CreateCommand({
             end
 
             if (ESPMainModel ~= nil) then
+                for _, v in next, ESPMainModel:GetChildren() do
+                    if (v:IsA("Highlight")) then
+                        v:Destroy();
+                    end
+                end
+
                 BaseModule.Ungroup(ESPMainModel);
             end
         end
@@ -1050,6 +1056,7 @@ local EmoteFuncs = {
 BaseUI.CreateCommand({
     CommandName = "Emote";
     DisplayText = "Emote [Emote]";
+    Description = "Plays an emote.";
     Function = function(Emote)
         if (not Emote or not EmoteFuncs[Emote]) then
             BaseUI.Notify("Error!", "Invalid emote.");
@@ -1066,10 +1073,6 @@ BaseUI.CreateCommand({
         end;
     };
 });
-
-BaseModule.Connections.PlayerDied:Connect(function(Player: Player)
-    print(Player.Name, "Has Died!");
-end)
 
 local NumberOfCommands: number = BaseModule.GetTableLength(BaseUI.AllCommandButtons);
 BaseUI.Notify("Loaded!", "Number of commands: "..NumberOfCommands);
